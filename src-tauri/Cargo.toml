@@ -19,7 +19,22 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
-tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs", "sync"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "macros"] }
+walkdir = "2"
+kamadak-exif = "0.5"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+uuid = { version = "1", features = ["v4"] }
+anyhow = "1"
+thiserror = "2"
+chrono = { version = "0.4", features = ["serde"] }
+log = "0.4"
+env_logger = "0.11"
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs", "sync", "test-util"] }
 
