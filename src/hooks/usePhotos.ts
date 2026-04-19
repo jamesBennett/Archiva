@@ -49,12 +49,23 @@ export function usePhotos() {
   // Debounce thumb-ready events — batch rapid-fire updates into one refresh
   const thumbTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    const unlisten = listen("thumb-ready", () => {
+    let cleanedUp = false;
+    let unlisten: (() => void) | null = null;
+
+    listen("thumb-ready", () => {
       if (thumbTimerRef.current) clearTimeout(thumbTimerRef.current);
       thumbTimerRef.current = setTimeout(() => void refresh(), 400);
+    }).then((fn) => {
+      if (cleanedUp) {
+        fn();
+      } else {
+        unlisten = fn;
+      }
     });
+
     return () => {
-      unlisten.then((fn) => fn());
+      cleanedUp = true;
+      unlisten?.();
       if (thumbTimerRef.current) clearTimeout(thumbTimerRef.current);
     };
   }, [refresh]);

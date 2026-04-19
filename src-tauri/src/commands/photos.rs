@@ -132,7 +132,8 @@ pub async fn scan_folder(
         .map_err(|e| e.to_string())?;
 
     let thumb_dir = crate::commands::thumbnails::thumb_dir(&app).map_err(|e| e.to_string())?;
-    let sem = std::sync::Arc::new(tokio::sync::Semaphore::new(8));
+    // Keep semaphore below max_connections (8) so reads stay unblocked during thumb generation.
+    let sem = std::sync::Arc::new(tokio::sync::Semaphore::new(4));
     for id in result.photo_ids.clone() {
         let pool_clone = pool_inner.clone();
         let dir_clone = thumb_dir.clone();

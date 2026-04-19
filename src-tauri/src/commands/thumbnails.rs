@@ -19,7 +19,11 @@ pub async fn generate_thumbnail_impl(
     tokio::fs::create_dir_all(thumb_dir).await?;
     let dest = thumb_dir.join(format!("{photo_id}.jpg"));
 
-    render_sips_thumb(Path::new(&source_path), &dest)?;
+    let src = PathBuf::from(&source_path);
+    let dest_clone = dest.clone();
+    tokio::task::spawn_blocking(move || render_sips_thumb(&src, &dest_clone))
+        .await
+        .context("spawn_blocking panicked")??;
 
     let dest_str = dest.to_string_lossy().to_string();
     sqlx::query("UPDATE photos SET thumb_path = ?, thumb_ready = 1 WHERE id = ?")
