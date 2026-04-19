@@ -13,27 +13,22 @@ pub fn read_exif(path: &Path) -> ExifData {
         return ExifData::default();
     };
 
-    let mut out = ExifData::default();
-
-    out.camera_make = string_field(&exif, Tag::Make);
-    out.camera_model = string_field(&exif, Tag::Model);
-    out.lens_model = string_field(&exif, Tag::LensModel);
-    out.created_at =
-        string_field(&exif, Tag::DateTimeOriginal).and_then(|s| parse_exif_datetime(&s));
-
-    out.width = u_field(&exif, Tag::PixelXDimension);
-    out.height = u_field(&exif, Tag::PixelYDimension);
-
-    out.focal_length = rational_field(&exif, Tag::FocalLength);
-    out.aperture = rational_field(&exif, Tag::FNumber);
-    out.shutter_speed = string_field(&exif, Tag::ExposureTime);
-    out.iso = u_field(&exif, Tag::PhotographicSensitivity);
-
-    out.latitude = gps_coord(&exif, Tag::GPSLatitude, Tag::GPSLatitudeRef, b'S');
-    out.longitude = gps_coord(&exif, Tag::GPSLongitude, Tag::GPSLongitudeRef, b'W');
-    out.altitude = rational_field(&exif, Tag::GPSAltitude);
-
-    out
+    ExifData {
+        camera_make: string_field(&exif, Tag::Make),
+        camera_model: string_field(&exif, Tag::Model),
+        lens_model: string_field(&exif, Tag::LensModel),
+        created_at: string_field(&exif, Tag::DateTimeOriginal)
+            .and_then(|s| parse_exif_datetime(&s)),
+        width: u_field(&exif, Tag::PixelXDimension),
+        height: u_field(&exif, Tag::PixelYDimension),
+        focal_length: rational_field(&exif, Tag::FocalLength),
+        aperture: rational_field(&exif, Tag::FNumber),
+        shutter_speed: string_field(&exif, Tag::ExposureTime),
+        iso: u_field(&exif, Tag::PhotographicSensitivity),
+        latitude: gps_coord(&exif, Tag::GPSLatitude, Tag::GPSLatitudeRef, b'S'),
+        longitude: gps_coord(&exif, Tag::GPSLongitude, Tag::GPSLongitudeRef, b'W'),
+        altitude: rational_field(&exif, Tag::GPSAltitude),
+    }
 }
 
 fn string_field(exif: &exif::Exif, tag: Tag) -> Option<String> {
