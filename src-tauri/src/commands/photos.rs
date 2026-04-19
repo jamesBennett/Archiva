@@ -132,19 +132,21 @@ pub async fn scan_folder(
         .map_err(|e| e.to_string())?;
 
     let thumb_dir = crate::commands::thumbnails::thumb_dir(&app).map_err(|e| e.to_string())?;
+    let sem = std::sync::Arc::new(tokio::sync::Semaphore::new(4));
     for id in result.photo_ids.clone() {
         let pool_clone = pool_inner.clone();
         let dir_clone = thumb_dir.clone();
-        let id_clone = id.clone();
+        let sem_clone = sem.clone();
         tokio::spawn(async move {
+            let _permit = sem_clone.acquire_owned().await;
             if let Err(e) = crate::commands::thumbnails::generate_thumbnail_impl(
-                &id_clone,
+                &id,
                 &dir_clone,
                 &pool_clone,
             )
             .await
             {
-                log::warn!("thumb failed {id_clone}: {e:#}");
+                log::warn!("thumb failed {id}: {e:#}");
             }
         });
     }

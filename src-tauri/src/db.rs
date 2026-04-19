@@ -83,6 +83,7 @@ pub async fn connect_file(db_path: &Path) -> anyhow::Result<SqlitePool> {
         .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal);
     let pool = SqlitePoolOptions::new()
         .max_connections(8)
+        .acquire_timeout(std::time::Duration::from_secs(10))
         .connect_with(opts)
         .await?;
     Ok(pool)
