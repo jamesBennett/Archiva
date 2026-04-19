@@ -113,6 +113,49 @@ fn ext_lower(path: &Path) -> Option<String> {
         .map(|s| s.to_lowercase())
 }
 
+// ---------------------------------------------------------------------------
+// Tauri command wrappers
+// ---------------------------------------------------------------------------
+
+use tauri::{AppHandle, State};
+
+#[tauri::command]
+pub async fn scan_folder(
+    path: String,
+    pool: State<'_, SqlitePool>,
+    app: AppHandle,
+) -> Result<ScanResult, String> {
+    let pool_inner = pool.inner().clone();
+    let path_buf = std::path::PathBuf::from(&path);
+    let result = scan_folder_impl(&path_buf, &pool_inner)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let thumb_dir = crate::commands::thumbnails::thumb_dir(&app).map_err(|e| e.to_string())?;
+    for id in result.photo_ids.clone() {
+        let pool_clone = pool_inner.clone();
+        let dir_clone = thumb_dir.clone();
+        let id_clone = id.clone();
+        tokio::spawn(async move {
+            if let Err(e) = crate::commands::thumbnails::generate_thumbnail_impl(
+                &id_clone,
+                &dir_clone,
+                &pool_clone,
+            )
+            .await
+            {
+                log::warn!("thumb failed {id_clone}: {e:#}");
+            }
+        });
+    }
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn list_photos(pool: State<'_, SqlitePool>) -> Result<Vec<Photo>, String> {
+    list_photos_impl(pool.inner()).await.map_err(|e| e.to_string())
+}
+
 pub async fn list_photos_impl(pool: &SqlitePool) -> anyhow::Result<Vec<Photo>> {
     let rows: Vec<PhotoRow> = sqlx::query_as::<_, PhotoRow>(
         "SELECT * FROM photos ORDER BY COALESCE(created_at, imported_at) DESC",

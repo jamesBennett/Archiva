@@ -46,6 +46,33 @@ fn render_image_crate_thumb(src: &Path, dest: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// Tauri helper + command wrapper
+// ---------------------------------------------------------------------------
+
+use tauri::{AppHandle, Manager, State};
+
+pub fn thumb_dir(app: &AppHandle) -> anyhow::Result<PathBuf> {
+    let data_dir = app
+        .path()
+        .app_data_dir()
+        .context("app_data_dir unavailable")?;
+    Ok(data_dir.join("thumbs"))
+}
+
+#[tauri::command]
+pub async fn generate_thumbnail(
+    photo_id: String,
+    pool: State<'_, SqlitePool>,
+    app: AppHandle,
+) -> Result<String, String> {
+    let dir = thumb_dir(&app).map_err(|e| e.to_string())?;
+    let path = generate_thumbnail_impl(&photo_id, &dir, pool.inner())
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().to_string())
+}
+
 fn render_heic_thumb(src: &Path, dest: &Path) -> anyhow::Result<()> {
     let output = std::process::Command::new("sips")
         .args([
