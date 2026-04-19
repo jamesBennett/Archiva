@@ -117,7 +117,7 @@ fn ext_lower(path: &Path) -> Option<String> {
 // Tauri command wrappers
 // ---------------------------------------------------------------------------
 
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
 
 #[tauri::command]
 pub async fn scan_folder(
@@ -137,16 +137,22 @@ pub async fn scan_folder(
         let pool_clone = pool_inner.clone();
         let dir_clone = thumb_dir.clone();
         let sem_clone = sem.clone();
+        let app_clone = app.clone();
         tokio::spawn(async move {
             let _permit = sem_clone.acquire_owned().await;
-            if let Err(e) = crate::commands::thumbnails::generate_thumbnail_impl(
+            match crate::commands::thumbnails::generate_thumbnail_impl(
                 &id,
                 &dir_clone,
                 &pool_clone,
             )
             .await
             {
-                log::warn!("thumb failed {id}: {e:#}");
+                Ok(_) => {
+                    let _ = app_clone.emit("thumb-ready", &id);
+                }
+                Err(e) => {
+                    log::warn!("thumb failed {id}: {e:#}");
+                }
             }
         });
     }

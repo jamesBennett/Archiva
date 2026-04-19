@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { listPhotos, scanFolder } from "../lib/tauri";
 import { useLibraryStore } from "../store/useLibraryStore";
 import type { ScanResult } from "../types";
@@ -43,6 +44,19 @@ export function usePhotos() {
 
   useEffect(() => {
     void refresh();
+  }, [refresh]);
+
+  // Debounce thumb-ready events — batch rapid-fire updates into one refresh
+  const thumbTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    const unlisten = listen("thumb-ready", () => {
+      if (thumbTimerRef.current) clearTimeout(thumbTimerRef.current);
+      thumbTimerRef.current = setTimeout(() => void refresh(), 400);
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+      if (thumbTimerRef.current) clearTimeout(thumbTimerRef.current);
+    };
   }, [refresh]);
 
   return { photos, loading, error, refresh, scan };
