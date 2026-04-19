@@ -20,10 +20,9 @@ async fn generates_jpeg_thumbnail_under_target_size() {
     let scanned = scan_folder_impl(src_dir.path(), &pool).await.unwrap();
     let photo_id = scanned.photo_ids[0].clone();
 
-    let thumb_path =
-        generate_thumbnail_impl(&photo_id, thumb_dir.path(), &pool)
-            .await
-            .unwrap();
+    let thumb_path = generate_thumbnail_impl(&photo_id, thumb_dir.path(), &pool)
+        .await
+        .unwrap();
 
     let img = image::open(&thumb_path).unwrap();
     let (w, h) = img.dimensions();
@@ -50,9 +49,8 @@ async fn generates_thumbnail_for_png() {
 
     let thumb_dir = TempDir::new().unwrap();
     let scanned = scan_folder_impl(src_dir.path(), &pool).await.unwrap();
-    let thumb_path =
-        generate_thumbnail_impl(&scanned.photo_ids[0], thumb_dir.path(), &pool)
-            .await
-            .unwrap();
+    let thumb_path = generate_thumbnail_impl(&scanned.photo_ids[0], thumb_dir.path(), &pool)
+        .await
+        .unwrap();
     assert!(thumb_path.exists());
 }

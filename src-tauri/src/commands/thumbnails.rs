@@ -78,4 +78,3 @@ pub async fn generate_thumbnail(
         .map_err(|e| e.to_string())?;
     Ok(path.to_string_lossy().to_string())
 }
-

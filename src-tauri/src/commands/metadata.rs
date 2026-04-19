@@ -18,8 +18,8 @@ pub fn read_exif(path: &Path) -> ExifData {
     out.camera_make = string_field(&exif, Tag::Make);
     out.camera_model = string_field(&exif, Tag::Model);
     out.lens_model = string_field(&exif, Tag::LensModel);
-    out.created_at = string_field(&exif, Tag::DateTimeOriginal)
-        .and_then(|s| parse_exif_datetime(&s));
+    out.created_at =
+        string_field(&exif, Tag::DateTimeOriginal).and_then(|s| parse_exif_datetime(&s));
 
     out.width = u_field(&exif, Tag::PixelXDimension);
     out.height = u_field(&exif, Tag::PixelYDimension);
@@ -64,12 +64,7 @@ fn rational_field(exif: &exif::Exif, tag: Tag) -> Option<f64> {
     }
 }
 
-fn gps_coord(
-    exif: &exif::Exif,
-    coord_tag: Tag,
-    ref_tag: Tag,
-    negative_ref: u8,
-) -> Option<f64> {
+fn gps_coord(exif: &exif::Exif, coord_tag: Tag, ref_tag: Tag, negative_ref: u8) -> Option<f64> {
     let field = exif.get_field(coord_tag, In::PRIMARY)?;
     let Value::Rational(ref rationals) = field.value else {
         return None;
