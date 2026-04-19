@@ -1,5 +1,4 @@
 use anyhow::{anyhow, Context};
-use image::imageops::FilterType;
 use sqlx::SqlitePool;
 use std::path::{Path, PathBuf};
 
@@ -20,11 +19,7 @@ pub async fn generate_thumbnail_impl(
     tokio::fs::create_dir_all(thumb_dir).await?;
     let dest = thumb_dir.join(format!("{photo_id}.jpg"));
 
-    if ext == "heic" {
-        render_heic_thumb(Path::new(&source_path), &dest)?;
-    } else {
-        render_image_crate_thumb(Path::new(&source_path), &dest)?;
-    }
+    render_sips_thumb(Path::new(&source_path), &dest)?;
 
     let dest_str = dest.to_string_lossy().to_string();
     sqlx::query("UPDATE photos SET thumb_path = ?, thumb_ready = 1 WHERE id = ?")
@@ -36,13 +31,20 @@ pub async fn generate_thumbnail_impl(
     Ok(dest)
 }
 
-fn render_image_crate_thumb(src: &Path, dest: &Path) -> anyhow::Result<()> {
-    let img = image::open(src).with_context(|| format!("open {}", src.display()))?;
-    let resized = img.resize(THUMB_MAX_EDGE, THUMB_MAX_EDGE, FilterType::Lanczos3);
-    resized
-        .to_rgb8()
-        .save_with_format(dest, image::ImageFormat::Jpeg)
-        .with_context(|| format!("save {}", dest.display()))?;
+fn render_sips_thumb(src: &Path, dest: &Path) -> anyhow::Result<()> {
+    let output = std::process::Command::new("sips")
+        .args(["-Z", &THUMB_MAX_EDGE.to_string(), "-s", "format", "jpeg"])
+        .arg(src)
+        .args(["--out", &dest.to_string_lossy()])
+        .output()
+        .context("sips failed to launch")?;
+    if !output.status.success() {
+        return Err(anyhow!(
+            "sips exit {}: {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
     Ok(())
 }
 
@@ -73,26 +75,3 @@ pub async fn generate_thumbnail(
     Ok(path.to_string_lossy().to_string())
 }
 
-fn render_heic_thumb(src: &Path, dest: &Path) -> anyhow::Result<()> {
-    let output = std::process::Command::new("sips")
-        .args([
-            "-s",
-            "format",
-            "jpeg",
-            "-Z",
-            &THUMB_MAX_EDGE.to_string(),
-        ])
-        .arg(src)
-        .arg("--out")
-        .arg(dest)
-        .output()
-        .context("sips failed to launch")?;
-    if !output.status.success() {
-        return Err(anyhow!(
-            "sips exit {}: {}",
-            output.status,
-            String::from_utf8_lossy(&output.stderr)
-        ));
-    }
-    Ok(())
-}
