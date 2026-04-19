@@ -1,5 +1,5 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Photo } from "../types";
 import { useLibraryStore } from "../store/useLibraryStore";
 import { PhotoThumb } from "./PhotoThumb";
@@ -40,7 +40,7 @@ export function PhotoGrid({ photos }: Props) {
     overscan: 4,
   });
 
-  const rows = useMemo(() => rowVirtualizer.getVirtualItems(), [rowVirtualizer, rowCount, rowHeight]);
+  const rows = rowVirtualizer.getVirtualItems();
 
   return (
     <div ref={parentRef} className="h-full w-full overflow-auto p-2">
