@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
+import { AddToCollectionButton } from "../components/AddToCollectionButton";
 import { FolderPicker } from "../components/FolderPicker";
 import { MetadataPanel } from "../components/MetadataPanel";
 import { PhotoGrid } from "../components/PhotoGrid";
@@ -59,6 +60,7 @@ export function Library() {
             {loading && <span className="text-xs text-muted">Loading…</span>}
           </div>
           <div className="flex items-center gap-2">
+            <AddToCollectionButton />
             <button
               type="button"
               onClick={() => void refresh()}
