@@ -39,8 +39,11 @@ describe("useLibraryStore", () => {
       photos: [],
       albums: [],
       selectedIds: new Set(),
-      activeAlbumId: null,
+      activeSource: { kind: "library" },
       activePhotoId: null,
+      expandedYears: new Set<number>(),
+      foldersHeightPct: 50,
+      albumPhotoIds: new Map(),
     });
   });
 
@@ -49,14 +52,14 @@ describe("useLibraryStore", () => {
     expect(useLibraryStore.getState().photos.map((p) => p.id)).toEqual(["a", "b"]);
   });
 
-  it("selectPhoto replaces selection with single id and sets activePhotoId", () => {
+  it("selectPhoto replaces selection with single id", () => {
     useLibraryStore.getState().selectPhoto("a");
     const s = useLibraryStore.getState();
     expect(Array.from(s.selectedIds)).toEqual(["a"]);
     expect(s.activePhotoId).toBe("a");
   });
 
-  it("toggleSelect adds then removes an id", () => {
+  it("toggleSelect adds then removes", () => {
     const { toggleSelect } = useLibraryStore.getState();
     toggleSelect("a");
     expect(useLibraryStore.getState().selectedIds.has("a")).toBe(true);
@@ -72,10 +75,35 @@ describe("useLibraryStore", () => {
     expect(s.activePhotoId).toBeNull();
   });
 
-  it("setActiveAlbum updates active album id", () => {
-    useLibraryStore.getState().setActiveAlbum("alb-1");
-    expect(useLibraryStore.getState().activeAlbumId).toBe("alb-1");
-    useLibraryStore.getState().setActiveAlbum(null);
-    expect(useLibraryStore.getState().activeAlbumId).toBeNull();
+  it("setActiveSource updates the active source", () => {
+    useLibraryStore.getState().setActiveSource({ kind: "date", year: 2019 });
+    expect(useLibraryStore.getState().activeSource).toEqual({
+      kind: "date",
+      year: 2019,
+    });
+    useLibraryStore.getState().setActiveSource({ kind: "library" });
+    expect(useLibraryStore.getState().activeSource).toEqual({ kind: "library" });
+  });
+
+  it("toggleYear adds then removes year from expanded set", () => {
+    useLibraryStore.getState().toggleYear(2019);
+    expect(useLibraryStore.getState().expandedYears.has(2019)).toBe(true);
+    useLibraryStore.getState().toggleYear(2019);
+    expect(useLibraryStore.getState().expandedYears.has(2019)).toBe(false);
+  });
+
+  it("setFoldersHeightPct clamps to 20-80", () => {
+    useLibraryStore.getState().setFoldersHeightPct(5);
+    expect(useLibraryStore.getState().foldersHeightPct).toBe(20);
+    useLibraryStore.getState().setFoldersHeightPct(95);
+    expect(useLibraryStore.getState().foldersHeightPct).toBe(80);
+    useLibraryStore.getState().setFoldersHeightPct(60);
+    expect(useLibraryStore.getState().foldersHeightPct).toBe(60);
+  });
+
+  it("setAlbumPhotoIds stores the id set for an album", () => {
+    useLibraryStore.getState().setAlbumPhotoIds("alb-1", new Set(["p1", "p2"]));
+    const ids = useLibraryStore.getState().albumPhotoIds.get("alb-1");
+    expect(ids && Array.from(ids)).toEqual(["p1", "p2"]);
   });
 });
