@@ -72,6 +72,7 @@ export function PhotoGrid({ photos }: Props) {
                   photo={photo}
                   selected={selectedIds.has(photo.id)}
                   onClick={() => selectPhoto(photo.id)}
+                  selectedIds={selectedIds}
                 />
               ))}
             </div>
