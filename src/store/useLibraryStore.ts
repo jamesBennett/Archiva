@@ -56,8 +56,7 @@ export const useLibraryStore = create<LibraryState>((set) => ({
 
   setPhotos: (photos) => set({ photos }),
   setAlbums: (albums) => set({ albums }),
-  selectPhoto: (id) =>
-    set({ selectedIds: new Set([id]), activePhotoId: id }),
+  selectPhoto: (id) => set({ activePhotoId: id }),
   toggleSelect: (id) =>
     set((state) => {
       const next = new Set(state.selectedIds);

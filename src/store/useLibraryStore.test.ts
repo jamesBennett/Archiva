@@ -52,11 +52,12 @@ describe("useLibraryStore", () => {
     expect(useLibraryStore.getState().photos.map((p) => p.id)).toEqual(["a", "b"]);
   });
 
-  it("selectPhoto replaces selection with single id", () => {
+  it("selectPhoto sets activePhotoId without touching selectedIds", () => {
+    useLibraryStore.setState({ selectedIds: new Set(["x"]) });
     useLibraryStore.getState().selectPhoto("a");
     const s = useLibraryStore.getState();
-    expect(Array.from(s.selectedIds)).toEqual(["a"]);
     expect(s.activePhotoId).toBe("a");
+    expect(Array.from(s.selectedIds)).toEqual(["x"]);
   });
 
   it("toggleSelect adds then removes", () => {
