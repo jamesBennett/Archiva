@@ -9,7 +9,7 @@ pub async fn generate_thumbnail_impl(
     thumb_dir: &Path,
     pool: &SqlitePool,
 ) -> anyhow::Result<PathBuf> {
-    let (source_path, ext): (String, String) =
+    let (source_path, _ext): (String, String) =
         sqlx::query_as("SELECT path, ext FROM photos WHERE id = ?")
             .bind(photo_id)
             .fetch_optional(pool)
@@ -78,4 +78,3 @@ pub async fn generate_thumbnail(
         .map_err(|e| e.to_string())?;
     Ok(path.to_string_lossy().to_string())
 }
-

@@ -6,15 +6,14 @@ async fn migration_creates_all_tables() {
     let pool = db::connect_in_memory().await.expect("pool");
     db::migrate(&pool).await.expect("migrate");
 
-    let tables: Vec<String> = sqlx::query(
-        "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
-    )
-    .fetch_all(&pool)
-    .await
-    .unwrap()
-    .into_iter()
-    .map(|row| row.get::<String, _>("name"))
-    .collect();
+    let tables: Vec<String> =
+        sqlx::query("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+            .fetch_all(&pool)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|row| row.get::<String, _>("name"))
+            .collect();
 
     assert!(tables.contains(&"photos".to_string()));
     assert!(tables.contains(&"albums".to_string()));

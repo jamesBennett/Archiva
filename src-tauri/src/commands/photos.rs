@@ -27,11 +27,10 @@ pub async fn scan_folder_impl(root: &Path, pool: &SqlitePool) -> anyhow::Result<
         }
 
         let path_str = path.to_string_lossy().to_string();
-        let existing: Option<(String,)> =
-            sqlx::query_as("SELECT id FROM photos WHERE path = ?")
-                .bind(&path_str)
-                .fetch_optional(pool)
-                .await?;
+        let existing: Option<(String,)> = sqlx::query_as("SELECT id FROM photos WHERE path = ?")
+            .bind(&path_str)
+            .fetch_optional(pool)
+            .await?;
         if existing.is_some() {
             result.skipped += 1;
             continue;
@@ -141,12 +140,8 @@ pub async fn scan_folder(
         let app_clone = app.clone();
         tokio::spawn(async move {
             let _permit = sem_clone.acquire_owned().await;
-            match crate::commands::thumbnails::generate_thumbnail_impl(
-                &id,
-                &dir_clone,
-                &pool_clone,
-            )
-            .await
+            match crate::commands::thumbnails::generate_thumbnail_impl(&id, &dir_clone, &pool_clone)
+                .await
             {
                 Ok(_) => {
                     let _ = app_clone.emit("thumb-ready", &id);
@@ -162,7 +157,9 @@ pub async fn scan_folder(
 
 #[tauri::command]
 pub async fn list_photos(pool: State<'_, SqlitePool>) -> Result<Vec<Photo>, String> {
-    list_photos_impl(pool.inner()).await.map_err(|e| e.to_string())
+    list_photos_impl(pool.inner())
+        .await
+        .map_err(|e| e.to_string())
 }
 
 pub async fn list_photos_impl(pool: &SqlitePool) -> anyhow::Result<Vec<Photo>> {
