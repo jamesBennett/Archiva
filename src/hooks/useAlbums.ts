@@ -1,6 +1,7 @@
 import { useCallback, useEffect } from "react";
 import {
   addPhotosToAlbum as apiAddPhotos,
+  createAlbum as apiCreateAlbum,
   listAlbumPhotos as apiListAlbumPhotos,
   listAlbums as apiListAlbums,
   reorderAlbums as apiReorderAlbums,
@@ -67,5 +68,14 @@ export function useAlbums() {
     [albumPhotoIds, setAlbumPhotoIds],
   );
 
-  return { albums, refresh, reorder, addPhotos };
+  const create = useCallback(
+    async (name: string) => {
+      const album = await apiCreateAlbum(name);
+      setAlbums([...albums, album]);
+      return album;
+    },
+    [albums, setAlbums],
+  );
+
+  return { albums, refresh, reorder, addPhotos, create };
 }

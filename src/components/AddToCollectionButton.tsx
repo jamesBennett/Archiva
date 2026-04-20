@@ -6,18 +6,38 @@ import { useLibraryStore } from "../store/useLibraryStore";
 export function AddToCollectionButton() {
   const selectedIds = useLibraryStore((s) => s.selectedIds);
   const clearSelection = useLibraryStore((s) => s.clearSelection);
-  const { albums, addPhotos } = useAlbums();
+  const { albums, addPhotos, create } = useAlbums();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const disabled = selectedIds.size === 0;
 
+  if (selectedIds.size === 0) return null;
+
+  const trimmed = query.trim();
   const filtered = albums.filter((a) =>
-    a.name.toLowerCase().includes(query.toLowerCase()),
+    a.name.toLowerCase().includes(trimmed.toLowerCase()),
   );
+  const hasExactMatch = albums.some(
+    (a) => a.name.toLowerCase() === trimmed.toLowerCase(),
+  );
+  const showCreate = trimmed.length > 0 && !hasExactMatch;
 
-  async function choose(albumId: string) {
+  async function addToAlbum(albumId: string) {
     const ids = Array.from(selectedIds);
     await addPhotos(albumId, ids).catch((e) => console.error("add failed", e));
+    setOpen(false);
+    setQuery("");
+    clearSelection();
+  }
+
+  async function createAndAdd() {
+    const ids = Array.from(selectedIds);
+    try {
+      const album = await create(trimmed);
+      await addPhotos(album.id, ids);
+    } catch (e) {
+      console.error("create+add failed", e);
+      return;
+    }
     setOpen(false);
     setQuery("");
     clearSelection();
@@ -28,8 +48,7 @@ export function AddToCollectionButton() {
       <Dialog.Trigger asChild>
         <button
           type="button"
-          disabled={disabled}
-          className="rounded-md border border-border bg-panel px-3 py-1.5 text-sm text-white hover:border-muted disabled:opacity-50"
+          className="rounded-md border border-border bg-panel px-3 py-1.5 text-sm text-white hover:border-muted"
         >
           Add to Collection ({selectedIds.size})
         </button>
@@ -43,7 +62,7 @@ export function AddToCollectionButton() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Filter albums…"
+            placeholder="Filter or create album…"
             className="mt-3 w-full rounded border border-border bg-bg px-2 py-1 text-sm"
           />
           <ul className="mt-3 max-h-64 overflow-auto">
@@ -51,14 +70,25 @@ export function AddToCollectionButton() {
               <li key={a.id}>
                 <button
                   type="button"
-                  onClick={() => void choose(a.id)}
+                  onClick={() => void addToAlbum(a.id)}
                   className="block w-full rounded px-2 py-1 text-left text-sm hover:bg-panel-hover"
                 >
                   {a.name}
                 </button>
               </li>
             ))}
-            {filtered.length === 0 && (
+            {showCreate && (
+              <li>
+                <button
+                  type="button"
+                  onClick={() => void createAndAdd()}
+                  className="block w-full rounded px-2 py-1 text-left text-sm text-accent hover:bg-panel-hover"
+                >
+                  + Create "{trimmed}"
+                </button>
+              </li>
+            )}
+            {filtered.length === 0 && !showCreate && (
               <li className="px-2 py-1 text-sm text-muted">No albums</li>
             )}
           </ul>
