@@ -121,6 +121,27 @@ pub async fn add_photos_to_album_impl(
     Ok(inserted)
 }
 
+pub async fn remove_photos_from_album_impl(
+    pool: &SqlitePool,
+    album_id: &str,
+    photo_ids: &[String],
+) -> anyhow::Result<usize> {
+    let mut tx = pool.begin().await?;
+    let mut removed = 0usize;
+    for photo_id in photo_ids {
+        let res = sqlx::query("DELETE FROM album_photos WHERE album_id = ? AND photo_id = ?")
+            .bind(album_id)
+            .bind(photo_id)
+            .execute(&mut *tx)
+            .await?;
+        if res.rows_affected() > 0 {
+            removed += 1;
+        }
+    }
+    tx.commit().await?;
+    Ok(removed)
+}
+
 #[derive(sqlx::FromRow)]
 struct AlbumRow {
     id: String,
@@ -189,6 +210,17 @@ pub async fn add_photos_to_album(
     pool: State<'_, SqlitePool>,
 ) -> Result<usize, String> {
     add_photos_to_album_impl(pool.inner(), &album_id, &photo_ids)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn remove_photos_from_album(
+    album_id: String,
+    photo_ids: Vec<String>,
+    pool: State<'_, SqlitePool>,
+) -> Result<usize, String> {
+    remove_photos_from_album_impl(pool.inner(), &album_id, &photo_ids)
         .await
         .map_err(|e| e.to_string())
 }
@@ -294,5 +326,28 @@ mod tests {
         assert_eq!(second, 0);
         let ids = list_album_photos_impl(&pool, &a.id).await.unwrap();
         assert_eq!(ids, vec!["p1".to_string(), "p2".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn remove_photos_deletes_only_matching_rows() {
+        let pool = setup().await;
+        let a = create_album_impl(&pool, "A").await.unwrap();
+        insert_photo(&pool, "p1").await;
+        insert_photo(&pool, "p2").await;
+        insert_photo(&pool, "p3").await;
+        add_photos_to_album_impl(
+            &pool,
+            &a.id,
+            &vec!["p1".to_string(), "p2".to_string(), "p3".to_string()],
+        )
+        .await
+        .unwrap();
+        let removed =
+            remove_photos_from_album_impl(&pool, &a.id, &vec!["p1".to_string(), "p3".to_string()])
+                .await
+                .unwrap();
+        assert_eq!(removed, 2);
+        let ids = list_album_photos_impl(&pool, &a.id).await.unwrap();
+        assert_eq!(ids, vec!["p2".to_string()]);
     }
 }

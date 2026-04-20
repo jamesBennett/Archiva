@@ -45,3 +45,7 @@ export function listAlbumPhotos(albumId: string): Promise<string[]> {
 export function addPhotosToAlbum(albumId: string, photoIds: string[]): Promise<number> {
   return invoke<number>("add_photos_to_album", { albumId, photoIds });
 }
+
+export function removePhotosFromAlbum(albumId: string, photoIds: string[]): Promise<number> {
+  return invoke<number>("remove_photos_from_album", { albumId, photoIds });
+}

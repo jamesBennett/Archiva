@@ -9,9 +9,10 @@ interface Props {
   selected: boolean;
   onClick: () => void;
   selectedIds: Set<string>;
+  onRemove?: () => void;
 }
 
-export function PhotoThumb({ photo, selected, onClick, selectedIds }: Props) {
+export function PhotoThumb({ photo, selected, onClick, selectedIds, onRemove }: Props) {
   const url = photo.thumb_ready ? thumbUrl(photo.thumb_path) : null;
   const toggleSelect = useLibraryStore((s) => s.toggleSelect);
   const hasSelection = selectedIds.size > 0;
@@ -88,6 +89,28 @@ export function PhotoThumb({ photo, selected, onClick, selectedIds }: Props) {
           </svg>
         )}
       </span>
+
+      {onRemove && (
+        <span
+          role="button"
+          aria-label={`Remove ${photo.filename} from album`}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          className="absolute top-1.5 right-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full border border-white/80 bg-black/50 text-white opacity-0 transition-opacity hover:bg-red-600 group-hover:opacity-100"
+        >
+          <svg viewBox="0 0 16 16" fill="none" className="h-3 w-3" aria-hidden>
+            <path
+              d="M4 4l8 8M12 4l-8 8"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
+        </span>
+      )}
     </button>
   );
 }

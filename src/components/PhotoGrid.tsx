@@ -6,12 +6,13 @@ import { PhotoThumb } from "./PhotoThumb";
 
 interface Props {
   photos: Photo[];
+  onRemoveFromAlbum?: (photoId: string) => void;
 }
 
 const THUMB_MIN = 160;
 const GAP = 8;
 
-export function PhotoGrid({ photos }: Props) {
+export function PhotoGrid({ photos, onRemoveFromAlbum }: Props) {
   const parentRef = useRef<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(0);
   const selectedIds = useLibraryStore((s) => s.selectedIds);
@@ -73,6 +74,7 @@ export function PhotoGrid({ photos }: Props) {
                   selected={selectedIds.has(photo.id)}
                   onClick={() => selectPhoto(photo.id)}
                   selectedIds={selectedIds}
+                  onRemove={onRemoveFromAlbum ? () => onRemoveFromAlbum(photo.id) : undefined}
                 />
               ))}
             </div>

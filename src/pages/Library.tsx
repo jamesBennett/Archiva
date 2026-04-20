@@ -15,7 +15,16 @@ export function Library() {
   const { loading, error, scan, refresh } = usePhotos();
   const photos = useLibraryStore((s) => s.photos);
   const activePhotoId = useLibraryStore((s) => s.activePhotoId);
-  const { albums, reorder, addPhotos } = useAlbums();
+  const activeSource = useLibraryStore((s) => s.activeSource);
+  const { albums, reorder, addPhotos, removePhotos } = useAlbums();
+  const onRemoveFromAlbum =
+    activeSource.kind === "album"
+      ? (photoId: string) => {
+          void removePhotos(activeSource.id, [photoId]).catch((e) =>
+            console.error("remove failed", e),
+          );
+        }
+      : undefined;
 
   const visible = useVisiblePhotos();
   const activePhoto = useMemo(
@@ -86,7 +95,7 @@ export function Library() {
                 No photos in this view.
               </div>
             ) : (
-              <PhotoGrid photos={visible} />
+              <PhotoGrid photos={visible} onRemoveFromAlbum={onRemoveFromAlbum} />
             )}
           </main>
           <aside className="w-72 shrink-0 border-l border-border bg-panel">

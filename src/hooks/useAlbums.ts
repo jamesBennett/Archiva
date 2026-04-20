@@ -4,6 +4,7 @@ import {
   createAlbum as apiCreateAlbum,
   listAlbumPhotos as apiListAlbumPhotos,
   listAlbums as apiListAlbums,
+  removePhotosFromAlbum as apiRemovePhotos,
   reorderAlbums as apiReorderAlbums,
 } from "../lib/tauri";
 import { useLibraryStore } from "../store/useLibraryStore";
@@ -77,5 +78,23 @@ export function useAlbums() {
     [albums, setAlbums],
   );
 
-  return { albums, refresh, reorder, addPhotos, create };
+  const removePhotos = useCallback(
+    async (albumId: string, photoIds: string[]) => {
+      const prev = albumPhotoIds.get(albumId);
+      if (prev) {
+        const next = new Set(prev);
+        for (const id of photoIds) next.delete(id);
+        setAlbumPhotoIds(albumId, next);
+      }
+      try {
+        return await apiRemovePhotos(albumId, photoIds);
+      } catch (e) {
+        if (prev) setAlbumPhotoIds(albumId, new Set(prev));
+        throw e;
+      }
+    },
+    [albumPhotoIds, setAlbumPhotoIds],
+  );
+
+  return { albums, refresh, reorder, addPhotos, create, removePhotos };
 }
