@@ -1,5 +1,14 @@
-import { useMemo } from "react";
-import { DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { useMemo, useState } from "react";
+import {
+  DndContext,
+  type DragEndEvent,
+  type DragStartEvent,
+  DragOverlay,
+  PointerSensor,
+  pointerWithin,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import { AddToCollectionButton } from "../components/AddToCollectionButton";
 import { FolderPicker } from "../components/FolderPicker";
@@ -10,6 +19,7 @@ import { useAlbums } from "../hooks/useAlbums";
 import { usePhotos } from "../hooks/usePhotos";
 import { useVisiblePhotos } from "../hooks/useVisiblePhotos";
 import { useLibraryStore } from "../store/useLibraryStore";
+import { thumbUrl } from "../lib/tauri";
 
 export function Library() {
   const { loading, error, scan, refresh } = usePhotos();
@@ -34,33 +44,61 @@ export function Library() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
+  const [dragPreview, setDragPreview] = useState<
+    { kind: "photo"; url: string | null; count: number } | { kind: "album"; name: string } | null
+  >(null);
+
+  function handleDragStart(e: DragStartEvent) {
+    const data = e.active.data.current;
+    if (data?.kind === "photo") {
+      const photo = photos.find((p) => p.id === data.photoId);
+      const count = Array.isArray(data.selectedIds) ? data.selectedIds.length : 1;
+      setDragPreview({
+        kind: "photo",
+        url: photo?.thumb_ready ? thumbUrl(photo.thumb_path) : null,
+        count,
+      });
+    } else if (data?.kind === "album") {
+      const album = albums.find((a) => a.id === data.albumId);
+      setDragPreview({ kind: "album", name: album?.name ?? "" });
+    }
+  }
+
   async function handleDragEnd(e: DragEndEvent) {
+    setDragPreview(null);
     const { active, over } = e;
     if (!over) return;
     const activeKind = active.data.current?.kind;
-    const overData = over.data.current;
 
-    if (activeKind === "album" && overData?.kind !== "album-drop") {
+    if (activeKind === "photo") {
+      const albumId = over.id as string;
+      if (!albums.some((a) => a.id === albumId)) return;
+      const selectedIds = (active.data.current?.selectedIds as string[] | undefined) ?? [];
+      if (selectedIds.length === 0) return;
+      await addPhotos(albumId, selectedIds).catch((err) =>
+        console.error("add photos failed", err),
+      );
+      return;
+    }
+
+    if (activeKind === "album") {
       if (active.id === over.id) return;
       const oldIndex = albums.findIndex((a) => a.id === active.id);
       const newIndex = albums.findIndex((a) => a.id === over.id);
       if (oldIndex < 0 || newIndex < 0) return;
       const nextIds = arrayMove(albums, oldIndex, newIndex).map((a) => a.id);
       await reorder(nextIds).catch((err) => console.error("reorder failed", err));
-      return;
-    }
-
-    if (activeKind === "photo" && overData?.kind === "album-drop") {
-      const selectedIds = (active.data.current?.selectedIds as string[] | undefined) ?? [];
-      if (selectedIds.length === 0) return;
-      await addPhotos(overData.albumId as string, selectedIds).catch((err) =>
-        console.error("add photos failed", err),
-      );
     }
   }
 
   return (
-    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={pointerWithin}
+      onDragStart={handleDragStart}
+      onDragCancel={() => setDragPreview(null)}
+      onDragEnd={handleDragEnd}
+    >
       <div className="flex h-screen w-screen flex-col bg-bg text-white">
         <header className="flex items-center justify-between gap-4 border-b border-border px-4 py-2">
           <div className="flex items-center gap-3">
@@ -103,6 +141,26 @@ export function Library() {
           </aside>
         </div>
       </div>
+      <DragOverlay dropAnimation={null}>
+        {dragPreview?.kind === "photo" ? (
+          <div className="relative h-20 w-20 overflow-hidden rounded-md border-2 border-accent bg-panel shadow-lg">
+            {dragPreview.url ? (
+              <img src={dragPreview.url} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-xs text-muted">…</div>
+            )}
+            {dragPreview.count > 1 && (
+              <span className="absolute -right-1 -top-1 rounded-full bg-accent px-1.5 py-0.5 text-xs font-bold text-white">
+                {dragPreview.count}
+              </span>
+            )}
+          </div>
+        ) : dragPreview?.kind === "album" ? (
+          <div className="rounded border border-accent bg-panel px-3 py-1 text-sm text-white shadow-lg">
+            {dragPreview.name}
+          </div>
+        ) : null}
+      </DragOverlay>
     </DndContext>
   );
 }
