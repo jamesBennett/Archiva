@@ -43,3 +43,26 @@ export interface Album {
   created_at: string;
   updated_at: string;
 }
+
+export type ActiveSource =
+  | { kind: "library" }
+  | { kind: "date"; year: number; month?: number }
+  | { kind: "album"; id: string }
+  | { kind: "no-date" };
+
+export interface MonthNode {
+  month: number; // 1-12
+  count: number;
+}
+
+export interface YearNode {
+  year: number;
+  count: number;
+  months: MonthNode[]; // desc
+}
+
+export interface DateTree {
+  total: number;
+  years: YearNode[]; // desc
+  noDateCount: number;
+}
