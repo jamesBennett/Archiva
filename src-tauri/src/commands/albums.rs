@@ -78,7 +78,10 @@ pub async fn reorder_albums_impl(pool: &SqlitePool, ordered_ids: &[String]) -> a
     Ok(())
 }
 
-pub async fn list_album_photos_impl(pool: &SqlitePool, album_id: &str) -> anyhow::Result<Vec<String>> {
+pub async fn list_album_photos_impl(
+    pool: &SqlitePool,
+    album_id: &str,
+) -> anyhow::Result<Vec<String>> {
     let rows: Vec<(String,)> = sqlx::query_as(
         "SELECT photo_id FROM album_photos WHERE album_id = ? ORDER BY sort_order ASC, added_at ASC",
     )
@@ -175,32 +178,54 @@ impl From<AlbumRow> for Album {
 
 #[tauri::command]
 pub async fn list_albums(pool: State<'_, SqlitePool>) -> Result<Vec<Album>, String> {
-    list_albums_impl(pool.inner()).await.map_err(|e| e.to_string())
+    list_albums_impl(pool.inner())
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn create_album(name: String, pool: State<'_, SqlitePool>) -> Result<Album, String> {
-    create_album_impl(pool.inner(), &name).await.map_err(|e| e.to_string())
+    create_album_impl(pool.inner(), &name)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn rename_album(id: String, name: String, pool: State<'_, SqlitePool>) -> Result<(), String> {
-    rename_album_impl(pool.inner(), &id, &name).await.map_err(|e| e.to_string())
+pub async fn rename_album(
+    id: String,
+    name: String,
+    pool: State<'_, SqlitePool>,
+) -> Result<(), String> {
+    rename_album_impl(pool.inner(), &id, &name)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn delete_album(id: String, pool: State<'_, SqlitePool>) -> Result<(), String> {
-    delete_album_impl(pool.inner(), &id).await.map_err(|e| e.to_string())
+    delete_album_impl(pool.inner(), &id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn reorder_albums(ordered_ids: Vec<String>, pool: State<'_, SqlitePool>) -> Result<(), String> {
-    reorder_albums_impl(pool.inner(), &ordered_ids).await.map_err(|e| e.to_string())
+pub async fn reorder_albums(
+    ordered_ids: Vec<String>,
+    pool: State<'_, SqlitePool>,
+) -> Result<(), String> {
+    reorder_albums_impl(pool.inner(), &ordered_ids)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn list_album_photos(album_id: String, pool: State<'_, SqlitePool>) -> Result<Vec<String>, String> {
-    list_album_photos_impl(pool.inner(), &album_id).await.map_err(|e| e.to_string())
+pub async fn list_album_photos(
+    album_id: String,
+    pool: State<'_, SqlitePool>,
+) -> Result<Vec<String>, String> {
+    list_album_photos_impl(pool.inner(), &album_id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -312,13 +337,10 @@ mod tests {
         let a = create_album_impl(&pool, "A").await.unwrap();
         insert_photo(&pool, "p1").await;
         insert_photo(&pool, "p2").await;
-        let first = add_photos_to_album_impl(
-            &pool,
-            &a.id,
-            &vec!["p1".to_string(), "p2".to_string()],
-        )
-        .await
-        .unwrap();
+        let first =
+            add_photos_to_album_impl(&pool, &a.id, &vec!["p1".to_string(), "p2".to_string()])
+                .await
+                .unwrap();
         assert_eq!(first, 2);
         let second = add_photos_to_album_impl(&pool, &a.id, &vec!["p1".to_string()])
             .await
