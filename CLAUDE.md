@@ -270,6 +270,7 @@ pub async fn scan_folder(
 - EXIF metadata panel
 
 ### Phase 2 — Albums
+- left side nav / file navigation
 - Create / rename / delete albums
 - Drag photos into albums
 - Smart albums (filter by rating, camera model, date range, GPS region)

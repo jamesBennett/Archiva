@@ -8,6 +8,8 @@ export default {
         panel: "#16181d",
         border: "#252830",
         muted: "#8b8f98",
+        accent: "#E7661F",
+        "panel-hover": "#1e2128",
       },
     },
   },

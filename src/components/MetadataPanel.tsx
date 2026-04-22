@@ -32,6 +32,18 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024).toFixed(0)} KB`;
 }
 
+function formatDate(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${y}-${m}-${day} ${hh}:${mm}`;
+}
+
 export function MetadataPanel({ photo }: Props) {
   if (!photo) {
     return (
@@ -59,8 +71,8 @@ export function MetadataPanel({ photo }: Props) {
         <Row label="Dimensions" value={dims} />
         <Row label="Size" value={formatSize(photo.size_bytes)} />
         <Row label="Format" value={photo.ext.toUpperCase()} />
-        <Row label="Created" value={photo.created_at} />
-        <Row label="Modified" value={photo.modified_at} />
+        <Row label="Created" value={formatDate(photo.created_at)} />
+        <Row label="Modified" value={formatDate(photo.modified_at)} />
       </section>
 
       <section>

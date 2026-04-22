@@ -27,6 +27,14 @@ pub fn run() {
             commands::photos::scan_folder,
             commands::photos::list_photos,
             commands::thumbnails::generate_thumbnail,
+            commands::albums::list_albums,
+            commands::albums::create_album,
+            commands::albums::rename_album,
+            commands::albums::delete_album,
+            commands::albums::reorder_albums,
+            commands::albums::list_album_photos,
+            commands::albums::add_photos_to_album,
+            commands::albums::remove_photos_from_album,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -53,3 +53,15 @@ pub struct ScanResult {
     pub skipped: usize,
     pub photo_ids: Vec<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Album {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub cover_photo_id: Option<String>,
+    pub is_smart: i64,
+    pub sort_order: i64,
+    pub created_at: String,
+    pub updated_at: String,
+}

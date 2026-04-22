@@ -39,8 +39,15 @@ describe("useLibraryStore", () => {
       photos: [],
       albums: [],
       selectedIds: new Set(),
-      activeAlbumId: null,
+      activeSource: { kind: "library" },
       activePhotoId: null,
+      expandedYears: new Set<number>(),
+      foldersHeightPct: 50,
+      albumPhotoIds: new Map(),
+      history: [{ source: { kind: "library" }, scrollTop: 0 }],
+      historyIndex: 0,
+      liveScrollTop: 0,
+      pendingScrollTop: null,
     });
   });
 
@@ -49,14 +56,15 @@ describe("useLibraryStore", () => {
     expect(useLibraryStore.getState().photos.map((p) => p.id)).toEqual(["a", "b"]);
   });
 
-  it("selectPhoto replaces selection with single id and sets activePhotoId", () => {
+  it("selectPhoto sets activePhotoId without touching selectedIds", () => {
+    useLibraryStore.setState({ selectedIds: new Set(["x"]) });
     useLibraryStore.getState().selectPhoto("a");
     const s = useLibraryStore.getState();
-    expect(Array.from(s.selectedIds)).toEqual(["a"]);
     expect(s.activePhotoId).toBe("a");
+    expect(Array.from(s.selectedIds)).toEqual(["x"]);
   });
 
-  it("toggleSelect adds then removes an id", () => {
+  it("toggleSelect adds then removes", () => {
     const { toggleSelect } = useLibraryStore.getState();
     toggleSelect("a");
     expect(useLibraryStore.getState().selectedIds.has("a")).toBe(true);
@@ -72,10 +80,85 @@ describe("useLibraryStore", () => {
     expect(s.activePhotoId).toBeNull();
   });
 
-  it("setActiveAlbum updates active album id", () => {
-    useLibraryStore.getState().setActiveAlbum("alb-1");
-    expect(useLibraryStore.getState().activeAlbumId).toBe("alb-1");
-    useLibraryStore.getState().setActiveAlbum(null);
-    expect(useLibraryStore.getState().activeAlbumId).toBeNull();
+  it("setActiveSource updates the active source", () => {
+    useLibraryStore.getState().setActiveSource({ kind: "date", year: 2019 });
+    expect(useLibraryStore.getState().activeSource).toEqual({
+      kind: "date",
+      year: 2019,
+    });
+    useLibraryStore.getState().setActiveSource({ kind: "library" });
+    expect(useLibraryStore.getState().activeSource).toEqual({ kind: "library" });
+  });
+
+  it("toggleYear adds then removes year from expanded set", () => {
+    useLibraryStore.getState().toggleYear(2019);
+    expect(useLibraryStore.getState().expandedYears.has(2019)).toBe(true);
+    useLibraryStore.getState().toggleYear(2019);
+    expect(useLibraryStore.getState().expandedYears.has(2019)).toBe(false);
+  });
+
+  it("setFoldersHeightPct clamps to 20-80", () => {
+    useLibraryStore.getState().setFoldersHeightPct(5);
+    expect(useLibraryStore.getState().foldersHeightPct).toBe(20);
+    useLibraryStore.getState().setFoldersHeightPct(95);
+    expect(useLibraryStore.getState().foldersHeightPct).toBe(80);
+    useLibraryStore.getState().setFoldersHeightPct(60);
+    expect(useLibraryStore.getState().foldersHeightPct).toBe(60);
+  });
+
+  it("setAlbumPhotoIds stores the id set for an album", () => {
+    useLibraryStore.getState().setAlbumPhotoIds("alb-1", new Set(["p1", "p2"]));
+    const ids = useLibraryStore.getState().albumPhotoIds.get("alb-1");
+    expect(ids && Array.from(ids)).toEqual(["p1", "p2"]);
+  });
+
+  it("setActiveSource pushes a new history entry", () => {
+    const s = useLibraryStore.getState();
+    s.setActiveSource({ kind: "date", year: 2019 });
+    s.setActiveSource({ kind: "album", id: "a1" });
+    const state = useLibraryStore.getState();
+    expect(state.history.length).toBe(3);
+    expect(state.historyIndex).toBe(2);
+    expect(state.activeSource).toEqual({ kind: "album", id: "a1" });
+  });
+
+  it("setActiveSource with same source is a no-op", () => {
+    useLibraryStore.getState().setActiveSource({ kind: "library" });
+    expect(useLibraryStore.getState().history.length).toBe(1);
+  });
+
+  it("historyBack restores source and pending scrollTop", () => {
+    const s = useLibraryStore.getState();
+    s.setLiveScrollTop(200);
+    s.setActiveSource({ kind: "date", year: 2019 });
+    useLibraryStore.getState().setLiveScrollTop(400);
+    useLibraryStore.getState().historyBack();
+    const state = useLibraryStore.getState();
+    expect(state.activeSource).toEqual({ kind: "library" });
+    expect(state.pendingScrollTop).toBe(200);
+    expect(state.historyIndex).toBe(0);
+  });
+
+  it("historyForward restores the next entry", () => {
+    const s = useLibraryStore.getState();
+    s.setActiveSource({ kind: "date", year: 2019 });
+    useLibraryStore.getState().historyBack();
+    useLibraryStore.getState().historyForward();
+    expect(useLibraryStore.getState().activeSource).toEqual({
+      kind: "date",
+      year: 2019,
+    });
+  });
+
+  it("setActiveSource after back truncates the future", () => {
+    const s = useLibraryStore.getState();
+    s.setActiveSource({ kind: "date", year: 2019 });
+    s.setActiveSource({ kind: "album", id: "a1" });
+    useLibraryStore.getState().historyBack();
+    useLibraryStore.getState().setActiveSource({ kind: "no-date" });
+    const state = useLibraryStore.getState();
+    expect(state.history.length).toBe(3);
+    expect(state.historyIndex).toBe(2);
+    expect(state.activeSource).toEqual({ kind: "no-date" });
   });
 });
