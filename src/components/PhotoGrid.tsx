@@ -17,6 +17,9 @@ export function PhotoGrid({ photos, onRemoveFromAlbum }: Props) {
   const [width, setWidth] = useState(0);
   const selectedIds = useLibraryStore((s) => s.selectedIds);
   const selectPhoto = useLibraryStore((s) => s.selectPhoto);
+  const setLiveScrollTop = useLibraryStore((s) => s.setLiveScrollTop);
+  const pendingScrollTop = useLibraryStore((s) => s.pendingScrollTop);
+  const consumePendingScrollTop = useLibraryStore((s) => s.consumePendingScrollTop);
 
   useEffect(() => {
     const el = parentRef.current;
@@ -28,6 +31,13 @@ export function PhotoGrid({ photos, onRemoveFromAlbum }: Props) {
     setWidth(el.clientWidth);
     return () => ro.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (pendingScrollTop == null) return;
+    const el = parentRef.current;
+    if (el) el.scrollTop = pendingScrollTop;
+    consumePendingScrollTop();
+  }, [pendingScrollTop, consumePendingScrollTop]);
 
   const columns = Math.max(1, Math.floor((width + GAP) / (THUMB_MIN + GAP)));
   const cellSize = columns > 0 ? (width - GAP * (columns - 1)) / columns : THUMB_MIN;
@@ -44,7 +54,11 @@ export function PhotoGrid({ photos, onRemoveFromAlbum }: Props) {
   const rows = rowVirtualizer.getVirtualItems();
 
   return (
-    <div ref={parentRef} className="h-full w-full overflow-auto p-2">
+    <div
+      ref={parentRef}
+      onScroll={(e) => setLiveScrollTop(e.currentTarget.scrollTop)}
+      className="h-full w-full overflow-auto p-2"
+    >
       <div
         style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}
       >

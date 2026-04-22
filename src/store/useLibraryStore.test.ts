@@ -44,6 +44,10 @@ describe("useLibraryStore", () => {
       expandedYears: new Set<number>(),
       foldersHeightPct: 50,
       albumPhotoIds: new Map(),
+      history: [{ source: { kind: "library" }, scrollTop: 0 }],
+      historyIndex: 0,
+      liveScrollTop: 0,
+      pendingScrollTop: null,
     });
   });
 
@@ -106,5 +110,55 @@ describe("useLibraryStore", () => {
     useLibraryStore.getState().setAlbumPhotoIds("alb-1", new Set(["p1", "p2"]));
     const ids = useLibraryStore.getState().albumPhotoIds.get("alb-1");
     expect(ids && Array.from(ids)).toEqual(["p1", "p2"]);
+  });
+
+  it("setActiveSource pushes a new history entry", () => {
+    const s = useLibraryStore.getState();
+    s.setActiveSource({ kind: "date", year: 2019 });
+    s.setActiveSource({ kind: "album", id: "a1" });
+    const state = useLibraryStore.getState();
+    expect(state.history.length).toBe(3);
+    expect(state.historyIndex).toBe(2);
+    expect(state.activeSource).toEqual({ kind: "album", id: "a1" });
+  });
+
+  it("setActiveSource with same source is a no-op", () => {
+    useLibraryStore.getState().setActiveSource({ kind: "library" });
+    expect(useLibraryStore.getState().history.length).toBe(1);
+  });
+
+  it("historyBack restores source and pending scrollTop", () => {
+    const s = useLibraryStore.getState();
+    s.setLiveScrollTop(200);
+    s.setActiveSource({ kind: "date", year: 2019 });
+    useLibraryStore.getState().setLiveScrollTop(400);
+    useLibraryStore.getState().historyBack();
+    const state = useLibraryStore.getState();
+    expect(state.activeSource).toEqual({ kind: "library" });
+    expect(state.pendingScrollTop).toBe(200);
+    expect(state.historyIndex).toBe(0);
+  });
+
+  it("historyForward restores the next entry", () => {
+    const s = useLibraryStore.getState();
+    s.setActiveSource({ kind: "date", year: 2019 });
+    useLibraryStore.getState().historyBack();
+    useLibraryStore.getState().historyForward();
+    expect(useLibraryStore.getState().activeSource).toEqual({
+      kind: "date",
+      year: 2019,
+    });
+  });
+
+  it("setActiveSource after back truncates the future", () => {
+    const s = useLibraryStore.getState();
+    s.setActiveSource({ kind: "date", year: 2019 });
+    s.setActiveSource({ kind: "album", id: "a1" });
+    useLibraryStore.getState().historyBack();
+    useLibraryStore.getState().setActiveSource({ kind: "no-date" });
+    const state = useLibraryStore.getState();
+    expect(state.history.length).toBe(3);
+    expect(state.historyIndex).toBe(2);
+    expect(state.activeSource).toEqual({ kind: "no-date" });
   });
 });

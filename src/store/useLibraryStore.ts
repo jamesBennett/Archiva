@@ -23,6 +23,19 @@ function saveSplit(n: number) {
   }
 }
 
+function sourcesEqual(a: ActiveSource, b: ActiveSource): boolean {
+  if (a.kind !== b.kind) return false;
+  if (a.kind === "date" && b.kind === "date")
+    return a.year === b.year && a.month === b.month;
+  if (a.kind === "album" && b.kind === "album") return a.id === b.id;
+  return true;
+}
+
+interface HistoryEntry {
+  source: ActiveSource;
+  scrollTop: number;
+}
+
 interface LibraryState {
   photos: Photo[];
   albums: Album[];
@@ -33,6 +46,11 @@ interface LibraryState {
   foldersHeightPct: number;
   albumPhotoIds: Map<string, Set<string>>;
 
+  history: HistoryEntry[];
+  historyIndex: number;
+  liveScrollTop: number;
+  pendingScrollTop: number | null;
+
   setPhotos: (photos: Photo[]) => void;
   setAlbums: (albums: Album[]) => void;
   selectPhoto: (id: string) => void;
@@ -42,17 +60,29 @@ interface LibraryState {
   toggleYear: (year: number) => void;
   setFoldersHeightPct: (n: number) => void;
   setAlbumPhotoIds: (albumId: string, ids: Set<string>) => void;
+
+  setLiveScrollTop: (n: number) => void;
+  consumePendingScrollTop: () => void;
+  historyBack: () => void;
+  historyForward: () => void;
 }
+
+const INITIAL_SOURCE: ActiveSource = { kind: "library" };
 
 export const useLibraryStore = create<LibraryState>((set) => ({
   photos: [],
   albums: [],
   selectedIds: new Set<string>(),
-  activeSource: { kind: "library" },
+  activeSource: INITIAL_SOURCE,
   activePhotoId: null,
   expandedYears: new Set<number>(),
   foldersHeightPct: loadSplit(),
   albumPhotoIds: new Map<string, Set<string>>(),
+
+  history: [{ source: INITIAL_SOURCE, scrollTop: 0 }],
+  historyIndex: 0,
+  liveScrollTop: 0,
+  pendingScrollTop: null,
 
   setPhotos: (photos) => set({ photos }),
   setAlbums: (albums) => set({ albums }),
@@ -65,7 +95,28 @@ export const useLibraryStore = create<LibraryState>((set) => ({
       return { selectedIds: next };
     }),
   clearSelection: () => set({ selectedIds: new Set(), activePhotoId: null }),
-  setActiveSource: (s) => set({ activeSource: s }),
+
+  setActiveSource: (s) =>
+    set((state) => {
+      const current = state.history[state.historyIndex];
+      if (current && sourcesEqual(current.source, s)) return {};
+      const past = state.history.slice(0, state.historyIndex);
+      const updatedCurrent = current
+        ? { ...current, scrollTop: state.liveScrollTop }
+        : null;
+      const nextHistory: HistoryEntry[] = [
+        ...past,
+        ...(updatedCurrent ? [updatedCurrent] : []),
+        { source: s, scrollTop: 0 },
+      ];
+      return {
+        activeSource: s,
+        history: nextHistory,
+        historyIndex: nextHistory.length - 1,
+        pendingScrollTop: 0,
+      };
+    }),
+
   toggleYear: (year) =>
     set((state) => {
       const next = new Set(state.expandedYears);
@@ -83,5 +134,44 @@ export const useLibraryStore = create<LibraryState>((set) => ({
       const next = new Map(state.albumPhotoIds);
       next.set(albumId, ids);
       return { albumPhotoIds: next };
+    }),
+
+  setLiveScrollTop: (n) => set({ liveScrollTop: n }),
+  consumePendingScrollTop: () => set({ pendingScrollTop: null }),
+
+  historyBack: () =>
+    set((state) => {
+      if (state.historyIndex <= 0) return {};
+      const history = [...state.history];
+      history[state.historyIndex] = {
+        ...history[state.historyIndex],
+        scrollTop: state.liveScrollTop,
+      };
+      const nextIndex = state.historyIndex - 1;
+      const entry = history[nextIndex];
+      return {
+        history,
+        historyIndex: nextIndex,
+        activeSource: entry.source,
+        pendingScrollTop: entry.scrollTop,
+      };
+    }),
+
+  historyForward: () =>
+    set((state) => {
+      if (state.historyIndex >= state.history.length - 1) return {};
+      const history = [...state.history];
+      history[state.historyIndex] = {
+        ...history[state.historyIndex],
+        scrollTop: state.liveScrollTop,
+      };
+      const nextIndex = state.historyIndex + 1;
+      const entry = history[nextIndex];
+      return {
+        history,
+        historyIndex: nextIndex,
+        activeSource: entry.source,
+        pendingScrollTop: entry.scrollTop,
+      };
     }),
 }));

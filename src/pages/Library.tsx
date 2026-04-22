@@ -26,6 +26,12 @@ export function Library() {
   const photos = useLibraryStore((s) => s.photos);
   const activePhotoId = useLibraryStore((s) => s.activePhotoId);
   const activeSource = useLibraryStore((s) => s.activeSource);
+  const historyBack = useLibraryStore((s) => s.historyBack);
+  const historyForward = useLibraryStore((s) => s.historyForward);
+  const canBack = useLibraryStore((s) => s.historyIndex > 0);
+  const canForward = useLibraryStore(
+    (s) => s.historyIndex < s.history.length - 1,
+  );
   const { albums, reorder, addPhotos, removePhotos } = useAlbums();
   const onRemoveFromAlbum =
     activeSource.kind === "album"
@@ -103,6 +109,30 @@ export function Library() {
         <header className="flex items-center justify-between gap-4 border-b border-border px-4 py-2">
           <div className="flex items-center gap-3">
             <h1 className="text-sm font-semibold">Archiva</h1>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                aria-label="Back"
+                onClick={historyBack}
+                disabled={!canBack}
+                className="flex h-6 w-6 items-center justify-center rounded text-muted hover:bg-panel-hover hover:text-white disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted"
+              >
+                <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="10 3 5 8 10 13" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                aria-label="Forward"
+                onClick={historyForward}
+                disabled={!canForward}
+                className="flex h-6 w-6 items-center justify-center rounded text-muted hover:bg-panel-hover hover:text-white disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted"
+              >
+                <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 3 11 8 6 13" />
+                </svg>
+              </button>
+            </div>
             <span className="text-xs text-muted">{visible.length} photos</span>
             {loading && <span className="text-xs text-muted">Loading…</span>}
           </div>
