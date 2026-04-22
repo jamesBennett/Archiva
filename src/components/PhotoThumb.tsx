@@ -1,5 +1,6 @@
 import clsx from "clsx";
 import { useDraggable } from "@dnd-kit/core";
+import * as Checkbox from "@radix-ui/react-checkbox";
 import type { Photo } from "../types";
 import { thumbUrl } from "../lib/tauri";
 import { useLibraryStore } from "../store/useLibraryStore";
@@ -28,12 +29,11 @@ export function PhotoThumb({ photo, selected, onClick, selectedIds, onRemove }: 
   });
 
   return (
-    <button
+    <div
       ref={draggable.setNodeRef}
-      type="button"
       onClick={onClick}
       className={clsx(
-        "group relative aspect-square overflow-hidden rounded-md bg-panel border transition-colors",
+        "group relative aspect-square overflow-hidden rounded-md bg-panel border transition-colors cursor-pointer",
         selected ? "border-accent" : "border-border hover:border-muted",
         draggable.isDragging && "opacity-50",
       )}
@@ -55,15 +55,12 @@ export function PhotoThumb({ photo, selected, onClick, selectedIds, onRemove }: 
         </div>
       )}
 
-      <span
-        role="checkbox"
-        aria-checked={selected}
+      <Checkbox.Root
+        checked={selected}
+        onCheckedChange={() => toggleSelect(photo.id)}
         aria-label={selected ? `Deselect ${photo.filename}` : `Select ${photo.filename}`}
         onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => {
-          e.stopPropagation();
-          toggleSelect(photo.id);
-        }}
+        onClick={(e) => e.stopPropagation()}
         className={clsx(
           "absolute top-1.5 left-1.5 z-10 flex h-5 w-5 items-center justify-center rounded border transition-opacity",
           selected
@@ -72,7 +69,7 @@ export function PhotoThumb({ photo, selected, onClick, selectedIds, onRemove }: 
           hasSelection ? "opacity-100" : "opacity-0 group-hover:opacity-100",
         )}
       >
-        {selected && (
+        <Checkbox.Indicator>
           <svg
             viewBox="0 0 16 16"
             fill="none"
@@ -87,12 +84,12 @@ export function PhotoThumb({ photo, selected, onClick, selectedIds, onRemove }: 
               strokeLinejoin="round"
             />
           </svg>
-        )}
-      </span>
+        </Checkbox.Indicator>
+      </Checkbox.Root>
 
       {onRemove && (
-        <span
-          role="button"
+        <button
+          type="button"
           aria-label={`Remove ${photo.filename} from album`}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
@@ -109,8 +106,8 @@ export function PhotoThumb({ photo, selected, onClick, selectedIds, onRemove }: 
               strokeLinecap="round"
             />
           </svg>
-        </span>
+        </button>
       )}
-    </button>
+    </div>
   );
 }
