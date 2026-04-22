@@ -307,7 +307,7 @@ mod tests {
         let pool = setup().await;
         let a = create_album_impl(&pool, "A").await.unwrap();
         insert_photo(&pool, "p1").await;
-        add_photos_to_album_impl(&pool, &a.id, &vec!["p1".to_string()])
+        add_photos_to_album_impl(&pool, &a.id, &["p1".to_string()])
             .await
             .unwrap();
         delete_album_impl(&pool, &a.id).await.unwrap();
@@ -323,7 +323,7 @@ mod tests {
         let a = create_album_impl(&pool, "A").await.unwrap();
         let b = create_album_impl(&pool, "B").await.unwrap();
         let c = create_album_impl(&pool, "C").await.unwrap();
-        reorder_albums_impl(&pool, &vec![c.id.clone(), a.id.clone(), b.id.clone()])
+        reorder_albums_impl(&pool, &[c.id.clone(), a.id.clone(), b.id.clone()])
             .await
             .unwrap();
         let list = list_albums_impl(&pool).await.unwrap();
@@ -337,12 +337,11 @@ mod tests {
         let a = create_album_impl(&pool, "A").await.unwrap();
         insert_photo(&pool, "p1").await;
         insert_photo(&pool, "p2").await;
-        let first =
-            add_photos_to_album_impl(&pool, &a.id, &vec!["p1".to_string(), "p2".to_string()])
-                .await
-                .unwrap();
+        let first = add_photos_to_album_impl(&pool, &a.id, &["p1".to_string(), "p2".to_string()])
+            .await
+            .unwrap();
         assert_eq!(first, 2);
-        let second = add_photos_to_album_impl(&pool, &a.id, &vec!["p1".to_string()])
+        let second = add_photos_to_album_impl(&pool, &a.id, &["p1".to_string()])
             .await
             .unwrap();
         assert_eq!(second, 0);
@@ -360,12 +359,12 @@ mod tests {
         add_photos_to_album_impl(
             &pool,
             &a.id,
-            &vec!["p1".to_string(), "p2".to_string(), "p3".to_string()],
+            &["p1".to_string(), "p2".to_string(), "p3".to_string()],
         )
         .await
         .unwrap();
         let removed =
-            remove_photos_from_album_impl(&pool, &a.id, &vec!["p1".to_string(), "p3".to_string()])
+            remove_photos_from_album_impl(&pool, &a.id, &["p1".to_string(), "p3".to_string()])
                 .await
                 .unwrap();
         assert_eq!(removed, 2);
