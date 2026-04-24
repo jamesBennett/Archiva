@@ -27,6 +27,7 @@ pub fn run() {
             commands::photos::scan_folder,
             commands::photos::list_photos,
             commands::thumbnails::generate_thumbnail,
+            commands::previews::generate_preview,
             commands::albums::list_albums,
             commands::albums::create_album,
             commands::albums::rename_album,
