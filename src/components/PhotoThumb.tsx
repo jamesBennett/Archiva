@@ -8,14 +8,16 @@ import { useLibraryStore } from "../store/useLibraryStore";
 interface Props {
   photo: Photo;
   selected: boolean;
+  active?: boolean;
   onClick: () => void;
   selectedIds: Set<string>;
   onRemove?: () => void;
 }
 
-export function PhotoThumb({ photo, selected, onClick, selectedIds, onRemove }: Props) {
+export function PhotoThumb({ photo, selected, active, onClick, selectedIds, onRemove }: Props) {
   const url = photo.thumb_ready ? thumbUrl(photo.thumb_path) : null;
   const toggleSelect = useLibraryStore((s) => s.toggleSelect);
+  const enterSingle = useLibraryStore((s) => s.enterSingle);
   const hasSelection = selectedIds.size > 0;
 
   const draggable = useDraggable({
@@ -32,9 +34,13 @@ export function PhotoThumb({ photo, selected, onClick, selectedIds, onRemove }: 
     <div
       ref={draggable.setNodeRef}
       onClick={onClick}
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        enterSingle(photo.id);
+      }}
       className={clsx(
         "group relative aspect-square overflow-hidden rounded-md bg-panel border transition-colors cursor-pointer",
-        selected ? "border-accent" : "border-border hover:border-muted",
+        selected || active ? "border-accent" : "border-border hover:border-muted",
         draggable.isDragging && "opacity-50",
       )}
       title={photo.filename}

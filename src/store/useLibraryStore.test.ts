@@ -48,6 +48,8 @@ describe("useLibraryStore", () => {
       historyIndex: 0,
       liveScrollTop: 0,
       pendingScrollTop: null,
+      viewMode: "grid",
+      scrollToActivePending: false,
     });
   });
 
@@ -160,5 +162,44 @@ describe("useLibraryStore", () => {
     expect(state.history.length).toBe(3);
     expect(state.historyIndex).toBe(2);
     expect(state.activeSource).toEqual({ kind: "no-date" });
+  });
+
+  it("defaults viewMode to grid", () => {
+    expect(useLibraryStore.getState().viewMode).toBe("grid");
+  });
+
+  it("enterSingle sets viewMode=single and activePhotoId", () => {
+    useLibraryStore.getState().enterSingle("abc");
+    expect(useLibraryStore.getState().viewMode).toBe("single");
+    expect(useLibraryStore.getState().activePhotoId).toBe("abc");
+  });
+
+  it("exitSingle sets viewMode=grid and keeps activePhotoId", () => {
+    useLibraryStore.getState().enterSingle("abc");
+    useLibraryStore.getState().exitSingle();
+    expect(useLibraryStore.getState().viewMode).toBe("grid");
+    expect(useLibraryStore.getState().activePhotoId).toBe("abc");
+  });
+
+  it("exitSingle requests scroll-to-active without touching selectedIds", () => {
+    useLibraryStore.setState({ selectedIds: new Set(["x"]) });
+    useLibraryStore.getState().enterSingle("abc");
+    useLibraryStore.getState().exitSingle();
+    const s = useLibraryStore.getState();
+    expect(Array.from(s.selectedIds)).toEqual(["x"]);
+    expect(s.scrollToActivePending).toBe(true);
+  });
+
+  it("consumeScrollToActive clears the flag", () => {
+    useLibraryStore.getState().enterSingle("abc");
+    useLibraryStore.getState().exitSingle();
+    useLibraryStore.getState().consumeScrollToActive();
+    expect(useLibraryStore.getState().scrollToActivePending).toBe(false);
+  });
+
+  it("enterSingle with a different id updates activePhotoId", () => {
+    useLibraryStore.getState().enterSingle("a");
+    useLibraryStore.getState().enterSingle("b");
+    expect(useLibraryStore.getState().activePhotoId).toBe("b");
   });
 });

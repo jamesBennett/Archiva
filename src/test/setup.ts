@@ -1,5 +1,14 @@
 import "@testing-library/jest-dom/vitest";
 
+if (typeof globalThis.ResizeObserver === "undefined") {
+  class ResizeObserverStub {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  (globalThis as unknown as { ResizeObserver: typeof ResizeObserverStub }).ResizeObserver = ResizeObserverStub;
+}
+
 // Node v25 exposes a broken `localStorage` global (--localstorage-file without a
 // valid path) that shadows jsdom's working implementation. Replace it with a simple
 // in-memory store so tests can use window.localStorage normally.

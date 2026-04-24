@@ -20,6 +20,9 @@ export function PhotoGrid({ photos, onRemoveFromAlbum }: Props) {
   const setLiveScrollTop = useLibraryStore((s) => s.setLiveScrollTop);
   const pendingScrollTop = useLibraryStore((s) => s.pendingScrollTop);
   const consumePendingScrollTop = useLibraryStore((s) => s.consumePendingScrollTop);
+  const activePhotoId = useLibraryStore((s) => s.activePhotoId);
+  const scrollToActivePending = useLibraryStore((s) => s.scrollToActivePending);
+  const consumeScrollToActive = useLibraryStore((s) => s.consumeScrollToActive);
 
   useEffect(() => {
     const el = parentRef.current;
@@ -52,6 +55,27 @@ export function PhotoGrid({ photos, onRemoveFromAlbum }: Props) {
   });
 
   const rows = rowVirtualizer.getVirtualItems();
+
+  useEffect(() => {
+    if (!scrollToActivePending || !activePhotoId || columns === 0) return;
+    const el = parentRef.current;
+    if (!el || el.clientHeight === 0) return;
+    const idx = photos.findIndex((p) => p.id === activePhotoId);
+    if (idx < 0) {
+      consumeScrollToActive();
+      return;
+    }
+    const row = Math.floor(idx / columns);
+    const target = Math.max(
+      0,
+      row * rowHeight + cellSize / 2 - el.clientHeight / 2,
+    );
+    const raf = requestAnimationFrame(() => {
+      el.scrollTop = target;
+      consumeScrollToActive();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [scrollToActivePending, activePhotoId, columns, photos, rowHeight, cellSize, consumeScrollToActive]);
 
   return (
     <div
@@ -86,6 +110,7 @@ export function PhotoGrid({ photos, onRemoveFromAlbum }: Props) {
                   key={photo.id}
                   photo={photo}
                   selected={selectedIds.has(photo.id)}
+                  active={photo.id === activePhotoId}
                   onClick={() => selectPhoto(photo.id)}
                   selectedIds={selectedIds}
                   onRemove={onRemoveFromAlbum ? () => onRemoveFromAlbum(photo.id) : undefined}
