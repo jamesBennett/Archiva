@@ -13,6 +13,10 @@ export function generateThumbnail(photoId: string): Promise<void> {
   return invoke<void>("generate_thumbnail", { photoId });
 }
 
+export function generatePreview(photoId: string, maxPx: number): Promise<string> {
+  return invoke<string>("generate_preview", { photoId, maxPx });
+}
+
 export function thumbUrl(thumbPath: string | null): string | null {
   if (!thumbPath) return null;
   return convertFileSrc(thumbPath);
