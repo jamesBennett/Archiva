@@ -181,11 +181,12 @@ describe("useLibraryStore", () => {
     expect(useLibraryStore.getState().activePhotoId).toBe("abc");
   });
 
-  it("exitSingle selects active photo and requests scroll-to-active", () => {
+  it("exitSingle requests scroll-to-active without touching selectedIds", () => {
+    useLibraryStore.setState({ selectedIds: new Set(["x"]) });
     useLibraryStore.getState().enterSingle("abc");
     useLibraryStore.getState().exitSingle();
     const s = useLibraryStore.getState();
-    expect(Array.from(s.selectedIds)).toEqual(["abc"]);
+    expect(Array.from(s.selectedIds)).toEqual(["x"]);
     expect(s.scrollToActivePending).toBe(true);
   });
 

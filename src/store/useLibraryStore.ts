@@ -145,15 +145,7 @@ export const useLibraryStore = create<LibraryState>((set) => ({
     }),
 
   enterSingle: (photoId) => set({ viewMode: "single", activePhotoId: photoId }),
-  exitSingle: () =>
-    set((state) => ({
-      viewMode: "grid",
-      scrollToActivePending: true,
-      selectedIds:
-        state.activePhotoId != null
-          ? new Set([state.activePhotoId])
-          : state.selectedIds,
-    })),
+  exitSingle: () => set({ viewMode: "grid", scrollToActivePending: true }),
   consumeScrollToActive: () => set({ scrollToActivePending: false }),
 
   setLiveScrollTop: (n) => set({ liveScrollTop: n }),

@@ -58,15 +58,24 @@ export function PhotoGrid({ photos, onRemoveFromAlbum }: Props) {
 
   useEffect(() => {
     if (!scrollToActivePending || !activePhotoId || columns === 0) return;
+    const el = parentRef.current;
+    if (!el || el.clientHeight === 0) return;
     const idx = photos.findIndex((p) => p.id === activePhotoId);
     if (idx < 0) {
       consumeScrollToActive();
       return;
     }
     const row = Math.floor(idx / columns);
-    rowVirtualizer.scrollToIndex(row, { align: "center" });
-    consumeScrollToActive();
-  }, [scrollToActivePending, activePhotoId, columns, photos, rowVirtualizer, consumeScrollToActive]);
+    const target = Math.max(
+      0,
+      row * rowHeight + cellSize / 2 - el.clientHeight / 2,
+    );
+    const raf = requestAnimationFrame(() => {
+      el.scrollTop = target;
+      consumeScrollToActive();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [scrollToActivePending, activePhotoId, columns, photos, rowHeight, cellSize, consumeScrollToActive]);
 
   return (
     <div
@@ -101,6 +110,7 @@ export function PhotoGrid({ photos, onRemoveFromAlbum }: Props) {
                   key={photo.id}
                   photo={photo}
                   selected={selectedIds.has(photo.id)}
+                  active={photo.id === activePhotoId}
                   onClick={() => selectPhoto(photo.id)}
                   selectedIds={selectedIds}
                   onRemove={onRemoveFromAlbum ? () => onRemoveFromAlbum(photo.id) : undefined}
