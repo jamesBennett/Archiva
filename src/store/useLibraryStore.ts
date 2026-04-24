@@ -42,6 +42,7 @@ interface LibraryState {
   selectedIds: Set<string>;
   activeSource: ActiveSource;
   activePhotoId: string | null;
+  viewMode: "grid" | "single";
   expandedYears: Set<number>;
   foldersHeightPct: number;
   albumPhotoIds: Map<string, Set<string>>;
@@ -61,6 +62,9 @@ interface LibraryState {
   setFoldersHeightPct: (n: number) => void;
   setAlbumPhotoIds: (albumId: string, ids: Set<string>) => void;
 
+  enterSingle: (photoId: string) => void;
+  exitSingle: () => void;
+
   setLiveScrollTop: (n: number) => void;
   consumePendingScrollTop: () => void;
   historyBack: () => void;
@@ -75,6 +79,7 @@ export const useLibraryStore = create<LibraryState>((set) => ({
   selectedIds: new Set<string>(),
   activeSource: INITIAL_SOURCE,
   activePhotoId: null,
+  viewMode: "grid",
   expandedYears: new Set<number>(),
   foldersHeightPct: loadSplit(),
   albumPhotoIds: new Map<string, Set<string>>(),
@@ -135,6 +140,9 @@ export const useLibraryStore = create<LibraryState>((set) => ({
       next.set(albumId, ids);
       return { albumPhotoIds: next };
     }),
+
+  enterSingle: (photoId) => set({ viewMode: "single", activePhotoId: photoId }),
+  exitSingle: () => set({ viewMode: "grid" }),
 
   setLiveScrollTop: (n) => set({ liveScrollTop: n }),
   consumePendingScrollTop: () => set({ pendingScrollTop: null }),
