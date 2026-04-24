@@ -62,6 +62,7 @@ describe("SinglePhotoView", () => {
       liveScrollTop: 0,
       pendingScrollTop: null,
       viewMode: "single",
+      scrollToActivePending: false,
     });
   });
   afterEach(() => {

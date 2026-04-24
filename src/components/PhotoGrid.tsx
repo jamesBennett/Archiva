@@ -20,6 +20,9 @@ export function PhotoGrid({ photos, onRemoveFromAlbum }: Props) {
   const setLiveScrollTop = useLibraryStore((s) => s.setLiveScrollTop);
   const pendingScrollTop = useLibraryStore((s) => s.pendingScrollTop);
   const consumePendingScrollTop = useLibraryStore((s) => s.consumePendingScrollTop);
+  const activePhotoId = useLibraryStore((s) => s.activePhotoId);
+  const scrollToActivePending = useLibraryStore((s) => s.scrollToActivePending);
+  const consumeScrollToActive = useLibraryStore((s) => s.consumeScrollToActive);
 
   useEffect(() => {
     const el = parentRef.current;
@@ -52,6 +55,18 @@ export function PhotoGrid({ photos, onRemoveFromAlbum }: Props) {
   });
 
   const rows = rowVirtualizer.getVirtualItems();
+
+  useEffect(() => {
+    if (!scrollToActivePending || !activePhotoId || columns === 0) return;
+    const idx = photos.findIndex((p) => p.id === activePhotoId);
+    if (idx < 0) {
+      consumeScrollToActive();
+      return;
+    }
+    const row = Math.floor(idx / columns);
+    rowVirtualizer.scrollToIndex(row, { align: "center" });
+    consumeScrollToActive();
+  }, [scrollToActivePending, activePhotoId, columns, photos, rowVirtualizer, consumeScrollToActive]);
 
   return (
     <div

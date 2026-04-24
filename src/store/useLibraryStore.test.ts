@@ -49,6 +49,7 @@ describe("useLibraryStore", () => {
       liveScrollTop: 0,
       pendingScrollTop: null,
       viewMode: "grid",
+      scrollToActivePending: false,
     });
   });
 
@@ -178,6 +179,21 @@ describe("useLibraryStore", () => {
     useLibraryStore.getState().exitSingle();
     expect(useLibraryStore.getState().viewMode).toBe("grid");
     expect(useLibraryStore.getState().activePhotoId).toBe("abc");
+  });
+
+  it("exitSingle selects active photo and requests scroll-to-active", () => {
+    useLibraryStore.getState().enterSingle("abc");
+    useLibraryStore.getState().exitSingle();
+    const s = useLibraryStore.getState();
+    expect(Array.from(s.selectedIds)).toEqual(["abc"]);
+    expect(s.scrollToActivePending).toBe(true);
+  });
+
+  it("consumeScrollToActive clears the flag", () => {
+    useLibraryStore.getState().enterSingle("abc");
+    useLibraryStore.getState().exitSingle();
+    useLibraryStore.getState().consumeScrollToActive();
+    expect(useLibraryStore.getState().scrollToActivePending).toBe(false);
   });
 
   it("enterSingle with a different id updates activePhotoId", () => {
