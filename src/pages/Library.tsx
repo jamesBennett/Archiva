@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   type DragEndEvent,
@@ -14,6 +14,7 @@ import { AddToCollectionButton } from "../components/AddToCollectionButton";
 import { FolderPicker } from "../components/FolderPicker";
 import { MetadataPanel } from "../components/MetadataPanel";
 import { PhotoGrid } from "../components/PhotoGrid";
+import { SinglePhotoView } from "../components/SinglePhotoView";
 import { SideNav } from "../components/sidenav/SideNav";
 import { useAlbums } from "../hooks/useAlbums";
 import { usePhotos } from "../hooks/usePhotos";
@@ -32,6 +33,8 @@ export function Library() {
   const canForward = useLibraryStore(
     (s) => s.historyIndex < s.history.length - 1,
   );
+  const viewMode = useLibraryStore((s) => s.viewMode);
+  const exitSingle = useLibraryStore((s) => s.exitSingle);
   const { albums, reorder, addPhotos, removePhotos } = useAlbums();
   const onRemoveFromAlbum =
     activeSource.kind === "album"
@@ -43,6 +46,14 @@ export function Library() {
       : undefined;
 
   const visible = useVisiblePhotos();
+
+  useEffect(() => {
+    if (viewMode !== "single") return;
+    if (activePhotoId == null) return;
+    if (!visible.some((p) => p.id === activePhotoId)) {
+      exitSingle();
+    }
+  }, [viewMode, activePhotoId, visible, exitSingle]);
   const activePhoto = useMemo(
     () => photos.find((p) => p.id === activePhotoId) ?? null,
     [photos, activePhotoId],
@@ -162,6 +173,8 @@ export function Library() {
               <div className="flex h-full items-center justify-center text-sm text-muted">
                 No photos in this view.
               </div>
+            ) : viewMode === "single" && activePhotoId ? (
+              <SinglePhotoView photos={visible} activePhotoId={activePhotoId} />
             ) : (
               <PhotoGrid photos={visible} onRemoveFromAlbum={onRemoveFromAlbum} />
             )}
