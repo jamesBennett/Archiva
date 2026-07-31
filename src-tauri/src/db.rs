@@ -77,7 +77,8 @@ CREATE INDEX IF NOT EXISTS idx_album_photos_album  ON album_photos(album_id);
 "#;
 
 pub async fn connect_file(db_path: &Path) -> anyhow::Result<SqlitePool> {
-    let opts = SqliteConnectOptions::from_str(&format!("sqlite://{}", db_path.display()))?
+    let opts = SqliteConnectOptions::new()
+        .filename(db_path)
         .create_if_missing(true)
         .foreign_keys(true)
         .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal);
@@ -107,4 +108,49 @@ pub async fn migrate(pool: &SqlitePool) -> anyhow::Result<()> {
         sqlx::query(trimmed).execute(pool).await?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn connect_file_handles_paths_with_spaces_and_hash() {
+        let dir = tempfile::tempdir().unwrap();
+        let weird = dir.path().join("My Photos #1");
+        std::fs::create_dir_all(&weird).unwrap();
+        let db_path = weird.join("catalog.db");
+
+        let pool = connect_file(&db_path).await.unwrap();
+        migrate(&pool).await.unwrap();
+
+        let (n,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM photos")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(n, 0);
+        pool.close().await;
+        assert!(db_path.exists());
+    }
+
+    // The `sqlite://` URL form splits the path on `?` and percent-decodes it, so a
+    // directory literally named `100%20MEDIA?` resolves to the wrong file (or errors).
+    #[tokio::test]
+    async fn connect_file_handles_paths_with_percent_and_question_mark() {
+        let dir = tempfile::tempdir().unwrap();
+        let weird = dir.path().join("100%20MEDIA?raw");
+        std::fs::create_dir_all(&weird).unwrap();
+        let db_path = weird.join("catalog.db");
+
+        let pool = connect_file(&db_path).await.unwrap();
+        migrate(&pool).await.unwrap();
+
+        let (n,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM photos")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(n, 0);
+        pool.close().await;
+        assert!(db_path.exists(), "db created at wrong path");
+    }
 }
