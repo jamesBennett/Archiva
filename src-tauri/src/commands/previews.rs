@@ -74,25 +74,17 @@ fn render_sips_preview(src: &Path, dest: &Path, bucket: u32) -> anyhow::Result<(
     Ok(())
 }
 
-use tauri::{AppHandle, Manager, State};
-
-pub fn preview_dir(app: &AppHandle) -> anyhow::Result<PathBuf> {
-    let data_dir = app
-        .path()
-        .app_data_dir()
-        .context("app_data_dir unavailable")?;
-    Ok(data_dir.join("previews"))
-}
+use tauri::State;
 
 #[tauri::command]
 pub async fn generate_preview(
     photo_id: String,
     max_px: u32,
-    pool: State<'_, SqlitePool>,
-    app: AppHandle,
+    state: State<'_, crate::state::AppState>,
 ) -> Result<String, String> {
-    let dir = preview_dir(&app).map_err(|e| e.to_string())?;
-    let path = generate_preview_impl(&photo_id, max_px, &dir, pool.inner())
+    let pool = state.pool().await?;
+    let dir = state.preview_dir().await?;
+    let path = generate_preview_impl(&photo_id, max_px, &dir, &pool)
         .await
         .map_err(|e| e.to_string())?;
     Ok(path.to_string_lossy().to_string())

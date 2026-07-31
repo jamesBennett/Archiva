@@ -121,16 +121,16 @@ use tauri::{AppHandle, Emitter, State};
 #[tauri::command]
 pub async fn scan_folder(
     path: String,
-    pool: State<'_, SqlitePool>,
+    state: State<'_, crate::state::AppState>,
     app: AppHandle,
 ) -> Result<ScanResult, String> {
-    let pool_inner = pool.inner().clone();
+    let pool_inner = state.pool().await?;
+    let thumb_dir = state.thumb_dir().await?;
     let path_buf = std::path::PathBuf::from(&path);
     let result = scan_folder_impl(&path_buf, &pool_inner)
         .await
         .map_err(|e| e.to_string())?;
 
-    let thumb_dir = crate::commands::thumbnails::thumb_dir(&app).map_err(|e| e.to_string())?;
     // Keep semaphore below max_connections (8) so reads stay unblocked during thumb generation.
     let sem = std::sync::Arc::new(tokio::sync::Semaphore::new(4));
     for id in result.photo_ids.clone() {
@@ -156,19 +156,37 @@ pub async fn scan_folder(
 }
 
 #[tauri::command]
-pub async fn list_photos(pool: State<'_, SqlitePool>) -> Result<Vec<Photo>, String> {
-    list_photos_impl(pool.inner())
+pub async fn list_photos(state: State<'_, crate::state::AppState>) -> Result<Vec<Photo>, String> {
+    let pool = state.pool().await?;
+    let thumb_dir = state.thumb_dir().await?;
+    list_photos_impl(&pool, &thumb_dir)
         .await
         .map_err(|e| e.to_string())
 }
 
-pub async fn list_photos_impl(pool: &SqlitePool) -> anyhow::Result<Vec<Photo>> {
+pub async fn list_photos_impl(pool: &SqlitePool, thumb_dir: &Path) -> anyhow::Result<Vec<Photo>> {
     let rows: Vec<PhotoRow> = sqlx::query_as::<_, PhotoRow>(
         "SELECT * FROM photos ORDER BY COALESCE(created_at, imported_at) DESC",
     )
     .fetch_all(pool)
     .await?;
-    Ok(rows.into_iter().map(Into::into).collect())
+    Ok(rows
+        .into_iter()
+        .map(|r| {
+            let mut p: Photo = r.into();
+            p.thumb_path = if p.thumb_ready == 1 {
+                Some(
+                    thumb_dir
+                        .join(format!("{}.jpg", p.id))
+                        .to_string_lossy()
+                        .to_string(),
+                )
+            } else {
+                None
+            };
+            p
+        })
+        .collect())
 }
 
 #[derive(sqlx::FromRow)]
@@ -231,5 +249,51 @@ impl From<PhotoRow> for Photo {
             thumb_path: r.thumb_path,
             thumb_ready: r.thumb_ready,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db;
+
+    async fn insert_photo(pool: &SqlitePool, id: &str, thumb_ready: i64) {
+        sqlx::query(
+            "INSERT INTO photos (id, path, filename, ext, size_bytes, imported_at, thumb_path, thumb_ready) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(id)
+        .bind(format!("/src/{id}.jpg"))
+        .bind(format!("{id}.jpg"))
+        .bind("jpg")
+        .bind(1_i64)
+        .bind(Utc::now().to_rfc3339())
+        .bind("/stale/absolute/path.jpg")
+        .bind(thumb_ready)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn list_photos_derives_thumb_path_from_thumb_dir() {
+        let pool = db::connect_in_memory().await.unwrap();
+        db::migrate(&pool).await.unwrap();
+        insert_photo(&pool, "ready", 1).await;
+        insert_photo(&pool, "notready", 0).await;
+
+        let photos = list_photos_impl(&pool, Path::new("/tmp/thumbs"))
+            .await
+            .unwrap();
+        assert_eq!(photos.len(), 2);
+
+        let ready = photos.iter().find(|p| p.id == "ready").unwrap();
+        assert_eq!(
+            ready.thumb_path.as_deref(),
+            Some("/tmp/thumbs/ready.jpg"),
+            "stored absolute thumb_path must be replaced by one derived from thumb_dir"
+        );
+
+        let not_ready = photos.iter().find(|p| p.id == "notready").unwrap();
+        assert_eq!(not_ready.thumb_path, None);
     }
 }

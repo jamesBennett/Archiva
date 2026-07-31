@@ -2,6 +2,7 @@ pub mod commands;
 pub mod db;
 pub mod library;
 pub mod prefs;
+pub mod state;
 pub mod types;
 
 use tauri::Manager;
@@ -15,14 +16,7 @@ pub fn run() {
         .setup(|app| {
             let data_dir = app.path().app_data_dir().expect("app_data_dir");
             std::fs::create_dir_all(&data_dir).expect("create app_data_dir");
-            let db_path = data_dir.join("archiva.db");
-
-            let handle = app.handle().clone();
-            tauri::async_runtime::block_on(async move {
-                let pool = db::connect_file(&db_path).await.expect("connect db");
-                db::migrate(&pool).await.expect("migrate db");
-                handle.manage(pool);
-            });
+            app.manage(state::AppState::new());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
