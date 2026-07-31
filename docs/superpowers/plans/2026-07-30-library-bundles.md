@@ -24,6 +24,7 @@
 - Rust verification per task: `cargo test` + `cargo clippy -- -D warnings` + `cargo fmt --check` (run in `src-tauri/`).
 - Frontend verification per task: `npm test` + `npx tsc --noEmit`.
 - Deviations from spec (approved): ⌥-at-launch and native File menu deferred — the LibrarySwitcher's "Switch Library…" covers forcing the picker.
+- Rebased onto current origin/main (albums + previews + side-nav landed after the spec): albums/previews commands are rewired through AppState like the rest; the preview cache (`previews/`) lives inside the bundle alongside `thumbs/`.
 
 ---
 
@@ -123,6 +124,7 @@ git commit -m "fix: use SqliteConnectOptions builder to survive special chars in
   - `pub struct LibraryMeta { pub uuid: String, pub name: String, pub schema_version: u32, pub created_at: String, pub app_version: String }` (derives `Debug, Clone, Serialize, Deserialize`)
   - `pub fn catalog_db_path(root: &Path) -> PathBuf` → `root.join("catalog.db")`
   - `pub fn thumb_dir(root: &Path) -> PathBuf` → `root.join("thumbs")`
+  - `pub fn preview_dir(root: &Path) -> PathBuf` → `root.join("previews")`
   - `pub fn read_meta(root: &Path) -> anyhow::Result<LibraryMeta>`
   - `pub fn write_meta(root: &Path, meta: &LibraryMeta) -> anyhow::Result<()>`
   - `pub fn create_bundle(parent: &Path, name: &str) -> anyhow::Result<PathBuf>` — returns bundle root; errors if target exists
@@ -156,6 +158,7 @@ mod tests {
         assert!(root.join("Info.plist").is_file());
         assert!(root.join("meta.json").is_file());
         assert!(thumb_dir(&root).is_dir());
+        assert!(preview_dir(&root).is_dir());
 
         let meta = read_meta(&root).unwrap();
         assert_eq!(meta.name, "Test Library");
@@ -244,6 +247,10 @@ pub fn thumb_dir(root: &Path) -> PathBuf {
     root.join("thumbs")
 }
 
+pub fn preview_dir(root: &Path) -> PathBuf {
+    root.join("previews")
+}
+
 fn meta_path(root: &Path) -> PathBuf {
     root.join("meta.json")
 }
@@ -278,6 +285,7 @@ pub fn create_bundle(parent: &Path, name: &str) -> anyhow::Result<PathBuf> {
         bail!("a library already exists at {}", root.display());
     }
     std::fs::create_dir_all(thumb_dir(&root)).context("create bundle dirs")?;
+    std::fs::create_dir_all(preview_dir(&root)).context("create bundle dirs")?;
     std::fs::write(root.join("Info.plist"), INFO_PLIST).context("write Info.plist")?;
     let meta = LibraryMeta {
         uuid: uuid::Uuid::new_v4().to_string(),
@@ -490,13 +498,15 @@ git commit -m "feat: prefs module with recent-libraries list"
 - Modify: `src-tauri/src/lib.rs` (add `pub mod state;`, manage `AppState`, drop pool management)
 - Modify: `src-tauri/src/commands/photos.rs` (command wrappers only)
 - Modify: `src-tauri/src/commands/thumbnails.rs` (command wrapper; delete `thumb_dir(&AppHandle)`; derive dest path)
+- Modify: `src-tauri/src/commands/albums.rs` (all 8 command wrappers: `pool: State<'_, SqlitePool>` → `state: State<'_, crate::state::AppState>` + `let pool = state.pool().await?;` — the `_impl` fns stay untouched)
+- Modify: `src-tauri/src/commands/previews.rs` (command wrapper: pool + dir via AppState; delete `preview_dir(&AppHandle)`)
 - Test: inline `#[cfg(test)]` in `src-tauri/src/state.rs`
 
 **Interfaces:**
 - Produces:
   - `pub struct AppState { pub current: tokio::sync::RwLock<Option<OpenLibrary>> }`
-  - `pub struct OpenLibrary { pub uuid: String, pub root: PathBuf, pub pool: SqlitePool, pub thumb_dir: PathBuf }`
-  - `impl AppState { pub fn new() -> Self; pub async fn pool(&self) -> Result<SqlitePool, String>; pub async fn thumb_dir(&self) -> Result<PathBuf, String>; pub async fn install(&self, lib: OpenLibrary) -> Option<OpenLibrary>; pub async fn take(&self) -> Option<OpenLibrary> }`
+  - `pub struct OpenLibrary { pub uuid: String, pub root: PathBuf, pub pool: SqlitePool, pub thumb_dir: PathBuf, pub preview_dir: PathBuf }`
+  - `impl AppState { pub fn new() -> Self; pub async fn pool(&self) -> Result<SqlitePool, String>; pub async fn thumb_dir(&self) -> Result<PathBuf, String>; pub async fn preview_dir(&self) -> Result<PathBuf, String>; pub async fn install(&self, lib: OpenLibrary) -> Option<OpenLibrary>; pub async fn take(&self) -> Option<OpenLibrary> }`
   - `impl Default for AppState` (clippy requires it alongside `new()`)
 - Consumes: `db::connect_file`, `db::migrate` (Task 1); `library::thumb_dir` (Task 2).
 
@@ -514,6 +524,7 @@ pub struct OpenLibrary {
     pub root: PathBuf,
     pub pool: SqlitePool,
     pub thumb_dir: PathBuf,
+    pub preview_dir: PathBuf,
 }
 
 pub struct AppState {
@@ -540,6 +551,7 @@ mod tests {
             root: PathBuf::from("/tmp/a.archivalib"),
             pool: pool.clone(),
             thumb_dir: PathBuf::from("/tmp/a.archivalib/thumbs"),
+            preview_dir: PathBuf::from("/tmp/a.archivalib/previews"),
         };
         assert!(state.install(lib).await.is_none());
         assert_eq!(
@@ -553,6 +565,7 @@ mod tests {
             root: PathBuf::from("/tmp/b.archivalib"),
             pool: pool2,
             thumb_dir: PathBuf::from("/tmp/b.archivalib/thumbs"),
+            preview_dir: PathBuf::from("/tmp/b.archivalib/previews"),
         };
         let old = state.install(lib2).await.unwrap();
         assert_eq!(old.uuid, "u1");
@@ -598,6 +611,14 @@ impl AppState {
         guard
             .as_ref()
             .map(|l| l.thumb_dir.clone())
+            .ok_or_else(|| NO_LIBRARY.to_string())
+    }
+
+    pub async fn preview_dir(&self) -> Result<PathBuf, String> {
+        let guard = self.current.read().await;
+        guard
+            .as_ref()
+            .map(|l| l.preview_dir.clone())
             .ok_or_else(|| NO_LIBRARY.to_string())
     }
 
@@ -708,6 +729,43 @@ pub async fn list_photos_impl(
 ```
 
 Update any existing callers/tests of `list_photos_impl` to pass a thumb dir (e.g. `Path::new("/tmp/thumbs")` in tests).
+
+In `src-tauri/src/commands/albums.rs`, rewire all 8 command wrappers the same mechanical way — `_impl` fns untouched:
+
+```rust
+#[tauri::command]
+pub async fn list_albums(
+    state: State<'_, crate::state::AppState>,
+) -> Result<Vec<Album>, String> {
+    let pool = state.pool().await?;
+    list_albums_impl(&pool).await.map_err(|e| e.to_string())
+}
+// …repeat for create_album, rename_album, delete_album, reorder_albums,
+// list_album_photos, add_photos_to_album, remove_photos_from_album —
+// keep each wrapper's other parameters exactly as they are.
+```
+
+In `src-tauri/src/commands/previews.rs`:
+- Delete `pub fn preview_dir(app: &AppHandle)`.
+- Rewire the command wrapper:
+
+```rust
+#[tauri::command]
+pub async fn generate_preview(
+    photo_id: String,
+    max_px: u32,
+    state: State<'_, crate::state::AppState>,
+) -> Result<String, String> {
+    let pool = state.pool().await?;
+    let dir = state.preview_dir().await?;
+    let path = generate_preview_impl(&photo_id, max_px, &dir, &pool)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().to_string())
+}
+```
+
+(Match the existing wrapper's exact parameter names/types — adjust the snippet if the current signature differs, e.g. `max_px` type. Remove the `AppHandle`/`Manager` imports if now unused.)
 
 In `src-tauri/src/commands/thumbnails.rs`:
 - Delete `pub fn thumb_dir(&AppHandle)` and the `Manager` import if now unused.
@@ -864,7 +922,9 @@ pub async fn open_library_core(
     let pool = crate::db::connect_file(&library::catalog_db_path(root)).await?;
     crate::db::migrate(&pool).await?;
     let thumb_dir = library::thumb_dir(root);
+    let preview_dir = library::preview_dir(root);
     tokio::fs::create_dir_all(&thumb_dir).await?;
+    tokio::fs::create_dir_all(&preview_dir).await?;
 
     let info = LibraryInfo {
         uuid: meta.uuid.clone(),
@@ -877,6 +937,7 @@ pub async fn open_library_core(
             root: root.to_path_buf(),
             pool,
             thumb_dir,
+            preview_dir,
         })
         .await;
     Ok((info, old))
@@ -898,11 +959,9 @@ pub async fn open_library_at(
         });
     }
 
-    // Thumbs live inside the bundle (e.g. under ~/Pictures) — outside the
-    // static asset-protocol scope, so allow the directory at runtime.
-    let _ = app
-        .asset_protocol_scope()
-        .allow_directory(library::thumb_dir(root), true);
+    // Thumbs/previews live inside the bundle (e.g. under ~/Pictures) —
+    // outside the static asset-protocol scope, so allow it at runtime.
+    let _ = app.asset_protocol_scope().allow_directory(root, true);
 
     let data_dir = app.path().app_data_dir().context("app_data_dir")?;
     let mut p = prefs::load(&data_dir);
@@ -1020,6 +1079,15 @@ Register in `src-tauri/src/lib.rs`:
     commands::photos::scan_folder,
     commands::photos::list_photos,
     commands::thumbnails::generate_thumbnail,
+    commands::previews::generate_preview,
+    commands::albums::list_albums,
+    commands::albums::create_album,
+    commands::albums::rename_album,
+    commands::albums::delete_album,
+    commands::albums::reorder_albums,
+    commands::albums::list_album_photos,
+    commands::albums::add_photos_to_album,
+    commands::albums::remove_photos_from_album,
     commands::library::list_recent_libraries,
     commands::library::create_library,
     commands::library::open_library,
@@ -1201,12 +1269,13 @@ pub async fn migrate_legacy(
         pool.close().await;
     }
 
-    // Move thumbnail files into the bundle (renames within a volume; falls
-    // back to copy+delete across volumes).
-    let legacy_thumbs = app_data_dir.join("thumbs");
-    if legacy_thumbs.is_dir() {
-        let dest_dir = crate::library::thumb_dir(&root);
-        for entry in std::fs::read_dir(&legacy_thumbs)? {
+    // Move cached thumbnail/preview files into the bundle (renames within a
+    // volume; falls back to copy+delete across volumes).
+    fn move_dir_contents(src: &Path, dest_dir: &Path) -> anyhow::Result<()> {
+        if !src.is_dir() {
+            return Ok(());
+        }
+        for entry in std::fs::read_dir(src)? {
             let entry = entry?;
             let dest = dest_dir.join(entry.file_name());
             if std::fs::rename(entry.path(), &dest).is_err() {
@@ -1214,7 +1283,16 @@ pub async fn migrate_legacy(
                 let _ = std::fs::remove_file(entry.path());
             }
         }
+        Ok(())
     }
+    move_dir_contents(
+        &app_data_dir.join("thumbs"),
+        &crate::library::thumb_dir(&root),
+    )?;
+    move_dir_contents(
+        &app_data_dir.join("previews"),
+        &crate::library::preview_dir(&root),
+    )?;
 
     // Success — retire the legacy file (and its WAL leftovers).
     std::fs::rename(&legacy_db, app_data_dir.join("archiva.db.migrated"))
@@ -1405,15 +1483,28 @@ git commit -m "feat: declare .archivalib package UTI for Finder"
 
 - [ ] **Step 1: Write the failing store test**
 
-Append to `src/store/useLibraryStore.test.ts` (inside the existing `describe`, reusing `makePhoto`):
+The store has grown since the spec was written (activeSource, viewMode, history, albumPhotoIds, side-nav prefs). `reset()` must clear all per-library data but preserve UI preferences (`expandedYears`, `foldersHeightPct`) and `currentLibrary` itself.
+
+Append to `src/store/useLibraryStore.test.ts` (inside the existing `describe`, reusing the existing `makePhoto` helper; follow the file's existing patterns):
 
 ```ts
-it("reset clears photos, albums, and selection but keeps currentLibrary", () => {
+it("reset clears per-library data but keeps currentLibrary and UI prefs", () => {
   useLibraryStore.setState({
     photos: [makePhoto("a")],
     selectedIds: new Set(["a"]),
     activePhotoId: "a",
-    activeAlbumId: "alb",
+    activeSource: { kind: "album", id: "alb1" },
+    viewMode: "single",
+    albumPhotoIds: new Map([["alb1", new Set(["a"])]]),
+    history: [
+      { source: { kind: "library" }, scrollTop: 0 },
+      { source: { kind: "album", id: "alb1" }, scrollTop: 120 },
+    ],
+    historyIndex: 1,
+    liveScrollTop: 120,
+    pendingScrollTop: 40,
+    expandedYears: new Set([2024]),
+    foldersHeightPct: 33,
     currentLibrary: { uuid: "u", name: "Lib", path: "/x.archivalib" },
   });
   useLibraryStore.getState().reset();
@@ -1422,7 +1513,16 @@ it("reset clears photos, albums, and selection but keeps currentLibrary", () => 
   expect(s.albums).toEqual([]);
   expect(s.selectedIds.size).toBe(0);
   expect(s.activePhotoId).toBeNull();
-  expect(s.activeAlbumId).toBeNull();
+  expect(s.activeSource).toEqual({ kind: "library" });
+  expect(s.viewMode).toBe("grid");
+  expect(s.albumPhotoIds.size).toBe(0);
+  expect(s.history).toEqual([{ source: { kind: "library" }, scrollTop: 0 }]);
+  expect(s.historyIndex).toBe(0);
+  expect(s.liveScrollTop).toBe(0);
+  expect(s.pendingScrollTop).toBeNull();
+  // UI prefs and the library itself survive
+  expect(s.expandedYears.has(2024)).toBe(true);
+  expect(s.foldersHeightPct).toBe(33);
   expect(s.currentLibrary?.uuid).toBe("u");
 });
 
@@ -1434,7 +1534,7 @@ it("setCurrentLibrary updates the library", () => {
 });
 ```
 
-Also add `currentLibrary: null` to the `beforeEach` `setState` block.
+If the existing `beforeEach` resets state via `setState`, add `currentLibrary: null, libraryLoading: true` to it.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -1458,65 +1558,47 @@ export interface RecentLibraryInfo extends LibraryInfo {
 }
 ```
 
-In `src/store/useLibraryStore.ts`, extend the interface and creator:
+In `src/store/useLibraryStore.ts`, **extend the existing store — do not rewrite it**. The store now carries side-nav, history, and view-mode state that must be preserved. Make exactly these additions:
+
+1. Add to the `LibraryState` interface:
 
 ```ts
-import { create } from "zustand";
-import type { Album, LibraryInfo, Photo } from "../types";
-
-interface LibraryState {
-  photos: Photo[];
-  albums: Album[];
-  selectedIds: Set<string>;
-  activeAlbumId: string | null;
-  activePhotoId: string | null;
   currentLibrary: LibraryInfo | null;
   libraryLoading: boolean;
-
-  setPhotos: (photos: Photo[]) => void;
-  setAlbums: (albums: Album[]) => void;
-  selectPhoto: (id: string) => void;
-  toggleSelect: (id: string) => void;
-  clearSelection: () => void;
-  setActiveAlbum: (id: string | null) => void;
   setCurrentLibrary: (lib: LibraryInfo | null) => void;
   setLibraryLoading: (loading: boolean) => void;
   reset: () => void;
-}
+```
 
-export const useLibraryStore = create<LibraryState>((set) => ({
-  photos: [],
-  albums: [],
-  selectedIds: new Set<string>(),
-  activeAlbumId: null,
-  activePhotoId: null,
-  currentLibrary: null,
-  libraryLoading: true,
+(and add `LibraryInfo` to the existing `import type` from `../types`).
 
-  setPhotos: (photos) => set({ photos }),
-  setAlbums: (albums) => set({ albums }),
-  selectPhoto: (id) => set({ selectedIds: new Set([id]), activePhotoId: id }),
-  toggleSelect: (id) =>
-    set((state) => {
-      const next = new Set(state.selectedIds);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return { selectedIds: next };
-    }),
-  clearSelection: () => set({ selectedIds: new Set(), activePhotoId: null }),
-  setActiveAlbum: (id) => set({ activeAlbumId: id }),
+2. Add to the creator's initial state: `currentLibrary: null, libraryLoading: true,`
+
+3. Add the actions (reuse the module's existing `INITIAL_SOURCE` constant):
+
+```ts
   setCurrentLibrary: (lib) => set({ currentLibrary: lib }),
   setLibraryLoading: (loading) => set({ libraryLoading: loading }),
+  // Clears per-library data on library switch. Deliberately preserves UI
+  // prefs (expandedYears, foldersHeightPct) and currentLibrary itself.
   reset: () =>
     set({
       photos: [],
       albums: [],
-      selectedIds: new Set(),
-      activeAlbumId: null,
+      selectedIds: new Set<string>(),
       activePhotoId: null,
+      activeSource: INITIAL_SOURCE,
+      viewMode: "grid",
+      scrollToActivePending: false,
+      albumPhotoIds: new Map<string, Set<string>>(),
+      history: [{ source: INITIAL_SOURCE, scrollTop: 0 }],
+      historyIndex: 0,
+      liveScrollTop: 0,
+      pendingScrollTop: null,
     }),
-}));
 ```
+
+Everything else in the file stays untouched.
 
 Append to `src/lib/tauri.ts`:
 
@@ -2052,7 +2134,7 @@ export function LibrarySwitcher() {
 }
 ```
 
-In `src/pages/Library.tsx`, add the switcher to the header's right-side button group (before Refresh):
+In `src/pages/Library.tsx`, add the import and insert `<LibrarySwitcher />` as the **first child** of the header's existing right-side button group (the `div.flex.items-center.gap-2` currently containing `<AddToCollectionButton />`, the Refresh button, and `<FolderPicker …/>`). Do not restructure anything else in the header — it also holds back/forward history buttons that must stay as-is.
 
 ```tsx
 import { LibrarySwitcher } from "../components/LibrarySwitcher";
@@ -2061,14 +2143,8 @@ import { LibrarySwitcher } from "../components/LibrarySwitcher";
 ```tsx
 <div className="flex items-center gap-2">
   <LibrarySwitcher />
-  <button
-    type="button"
-    onClick={() => void refresh()}
-    className="rounded-md border border-border bg-panel px-3 py-1.5 text-sm text-white hover:border-muted"
-  >
-    Refresh
-  </button>
-  <FolderPicker onScan={handleScan} disabled={loading} />
+  <AddToCollectionButton />
+  {/* existing Refresh button and FolderPicker stay exactly as they are */}
 </div>
 ```
 

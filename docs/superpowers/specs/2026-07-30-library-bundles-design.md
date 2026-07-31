@@ -22,8 +22,10 @@ MyPhotos.archivalib/
 ├── Info.plist                       ← declares CFBundlePackageType
 ├── meta.json                        ← uuid, name, schema_version, created_at, app_version
 ├── catalog.db  (+ -wal, -shm)       ← existing schema, unchanged
-└── thumbs/
-    └── {photo_uuid}.jpg
+├── thumbs/
+│   └── {photo_uuid}.jpg
+└── previews/
+    └── {photo_uuid}_{bucket}.jpg    ← preview cache moves with the library
 ```
 
 - **Package registration:** `Info.plist` inside the bundle plus a
