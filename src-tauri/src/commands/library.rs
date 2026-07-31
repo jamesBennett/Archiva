@@ -73,18 +73,26 @@ pub async fn open_library_at(
     // outside the static asset-protocol scope, so allow it at runtime.
     let _ = app.asset_protocol_scope().allow_directory(root, true);
 
-    let data_dir = app.path().app_data_dir().context("app_data_dir")?;
-    let mut p = prefs::load(&data_dir);
-    prefs::push_recent(
-        &mut p,
-        prefs::RecentLibrary {
-            uuid: info.uuid.clone(),
-            path: info.path.clone(),
-            name: info.name.clone(),
-            last_opened: chrono::Utc::now().to_rfc3339(),
-        },
-    );
-    prefs::save(&data_dir, &p)?;
+    // The swap already happened — prefs are best-effort. Failing here and
+    // skipping the event would strand the frontend on the old library.
+    match app.path().app_data_dir().context("app_data_dir") {
+        Ok(data_dir) => {
+            let mut p = prefs::load(&data_dir);
+            prefs::push_recent(
+                &mut p,
+                prefs::RecentLibrary {
+                    uuid: info.uuid.clone(),
+                    path: info.path.clone(),
+                    name: info.name.clone(),
+                    last_opened: chrono::Utc::now().to_rfc3339(),
+                },
+            );
+            if let Err(e) = prefs::save(&data_dir, &p) {
+                log::warn!("could not persist recent libraries: {e:#}");
+            }
+        }
+        Err(e) => log::warn!("could not resolve app_data_dir for prefs: {e:#}"),
+    }
 
     let _ = app.emit("library-changed", Some(info.clone()));
     Ok(info)

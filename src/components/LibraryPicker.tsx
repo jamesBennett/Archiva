@@ -8,6 +8,7 @@ export function LibraryPicker() {
   const [newOpen, setNewOpen] = useState(false);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [createFailed, setCreateFailed] = useState(false);
 
   async function handleOpenOther() {
     // Directory mode: the UTI is only registered in the bundled app, so in
@@ -21,13 +22,24 @@ export function LibraryPicker() {
     const parent = await open({ directory: true, multiple: false });
     if (typeof parent !== "string") return;
     setBusy(true);
+    setCreateFailed(false);
     try {
-      await createAt(parent, name.trim());
-      setNewOpen(false);
-      setName("");
+      // Only tear down the dialog on success — otherwise the error would render
+      // behind the modal with no way back to the entered name.
+      const ok = await createAt(parent, name.trim());
+      setCreateFailed(!ok);
+      if (ok) {
+        setNewOpen(false);
+        setName("");
+      }
     } finally {
       setBusy(false);
     }
+  }
+
+  function handleNewOpenChange(open: boolean) {
+    setNewOpen(open);
+    if (!open) setCreateFailed(false);
   }
 
   return (
@@ -63,7 +75,7 @@ export function LibraryPicker() {
         </ul>
 
         <div className="flex gap-2">
-          <Dialog.Root open={newOpen} onOpenChange={setNewOpen}>
+          <Dialog.Root open={newOpen} onOpenChange={handleNewOpenChange}>
             <Dialog.Trigger asChild>
               <button
                 type="button"
@@ -82,8 +94,13 @@ export function LibraryPicker() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Library name"
-                  className="mb-4 w-full rounded-md border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-muted"
+                  className="mb-3 w-full rounded-md border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-muted"
                 />
+                {createFailed && (
+                  <p role="alert" className="mb-3 text-xs text-red-400">
+                    {error ?? "Could not create library"}
+                  </p>
+                )}
                 <div className="flex justify-end gap-2">
                   <Dialog.Close asChild>
                     <button

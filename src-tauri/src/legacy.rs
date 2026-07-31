@@ -38,15 +38,6 @@ pub async fn migrate_legacy(
     std::fs::copy(&legacy_db, crate::library::catalog_db_path(&root))
         .context("copy legacy db into bundle")?;
 
-    // Stale absolute thumb paths → clear so thumbnails regenerate in-bundle.
-    {
-        let pool = crate::db::connect_file(&crate::library::catalog_db_path(&root)).await?;
-        sqlx::query("UPDATE photos SET thumb_path = NULL, thumb_ready = 0")
-            .execute(&pool)
-            .await?;
-        pool.close().await;
-    }
-
     // Move cached thumbnail/preview files into the bundle (renames within a
     // volume; falls back to copy+delete across volumes).
     fn move_dir_contents(src: &Path, dest_dir: &Path) -> anyhow::Result<()> {
@@ -72,6 +63,31 @@ pub async fn migrate_legacy(
         &crate::library::preview_dir(&root),
     )?;
 
+    // thumb_path is dead (paths are derived from the bundle now), but the moved
+    // files land exactly where the derived path points — so keep thumb_ready
+    // for rows whose thumb actually made it, and only regenerate the rest.
+    {
+        let thumbs = crate::library::thumb_dir(&root);
+        let pool = crate::db::connect_file(&crate::library::catalog_db_path(&root)).await?;
+        let ids: Vec<(String,)> = sqlx::query_as("SELECT id FROM photos")
+            .fetch_all(&pool)
+            .await?;
+        let mut tx = pool.begin().await?;
+        sqlx::query("UPDATE photos SET thumb_path = NULL, thumb_ready = 0")
+            .execute(&mut *tx)
+            .await?;
+        for (id,) in ids {
+            if thumbs.join(format!("{id}.jpg")).is_file() {
+                sqlx::query("UPDATE photos SET thumb_ready = 1 WHERE id = ?")
+                    .bind(&id)
+                    .execute(&mut *tx)
+                    .await?;
+            }
+        }
+        tx.commit().await?;
+        pool.close().await;
+    }
+
     // Success — retire the legacy file (and its WAL leftovers).
     std::fs::rename(&legacy_db, app_data_dir.join("archiva.db.migrated"))
         .context("rename legacy db")?;
@@ -92,6 +108,14 @@ mod tests {
         sqlx::query(
             "INSERT INTO photos (id, path, filename, ext, size_bytes, imported_at, thumb_path, thumb_ready)
              VALUES ('p1', '/photos/a.jpg', 'a.jpg', 'jpg', 10, '2026-01-01T00:00:00Z', '/old/thumbs/p1.jpg', 1)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        // p2 has no cached thumb file — must come out needing regeneration.
+        sqlx::query(
+            "INSERT INTO photos (id, path, filename, ext, size_bytes, imported_at, thumb_path, thumb_ready)
+             VALUES ('p2', '/photos/b.jpg', 'b.jpg', 'jpg', 20, '2026-01-01T00:00:00Z', '/old/thumbs/p2.jpg', 1)",
         )
         .execute(&pool)
         .await
@@ -121,13 +145,19 @@ mod tests {
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert_eq!(n, 1);
-        // Stale thumb paths cleared for regeneration.
-        let (ready,): (i64,) = sqlx::query_as("SELECT thumb_ready FROM photos WHERE id = 'p1'")
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-        assert_eq!(ready, 0);
+        assert_eq!(n, 2);
+        // Migrated thumb survives; the row without a file regenerates.
+        let rows: Vec<(String, Option<String>, i64)> =
+            sqlx::query_as("SELECT id, thumb_path, thumb_ready FROM photos ORDER BY id")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert_eq!(rows[0].0, "p1");
+        assert_eq!(rows[0].1, None);
+        assert_eq!(rows[0].2, 1);
+        assert_eq!(rows[1].0, "p2");
+        assert_eq!(rows[1].1, None);
+        assert_eq!(rows[1].2, 0);
         pool.close().await;
 
         // Thumbs moved into the bundle; legacy db renamed, original gone.

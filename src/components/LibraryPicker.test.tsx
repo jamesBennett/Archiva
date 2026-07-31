@@ -1,5 +1,6 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LibraryPicker } from "./LibraryPicker";
 import type { RecentLibraryInfo } from "../types";
 
@@ -20,21 +21,40 @@ const recents: RecentLibraryInfo[] = [
   },
 ];
 
+const hookState: {
+  error: string | null;
+  createAt: (parentDir: string, name: string) => Promise<boolean>;
+} = {
+  error: null,
+  createAt: () => Promise.resolve(true),
+};
+
 vi.mock("../hooks/useLibrary", () => ({
   useLibrary: () => ({
     current: null,
     loading: false,
     recents,
-    error: null,
+    error: hookState.error,
     refreshRecents: vi.fn(),
     openAt: vi.fn(),
-    createAt: vi.fn(),
+    createAt: hookState.createAt,
     close: vi.fn(),
     reveal: vi.fn(),
   }),
 }));
 
+const openDialog = vi.fn<() => Promise<string | null>>();
+vi.mock("@tauri-apps/plugin-dialog", () => ({
+  open: (...args: unknown[]) => openDialog(...(args as [])),
+}));
+
 describe("LibraryPicker", () => {
+  beforeEach(() => {
+    hookState.error = null;
+    hookState.createAt = () => Promise.resolve(true);
+    openDialog.mockReset();
+  });
+
   it("renders recents; missing libraries are disabled", () => {
     render(<LibraryPicker />);
     expect(screen.getByText("Main")).toBeInTheDocument();
@@ -47,5 +67,37 @@ describe("LibraryPicker", () => {
     render(<LibraryPicker />);
     expect(screen.getByText("New Library…")).toBeInTheDocument();
     expect(screen.getByText("Open Other…")).toBeInTheDocument();
+  });
+
+  async function openCreateDialog(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByText("New Library…"));
+    await user.type(screen.getByPlaceholderText("Library name"), "Main");
+    openDialog.mockResolvedValue("/Users/x/Pictures");
+    await user.click(screen.getByText("Choose Location…"));
+  }
+
+  it("keeps the dialog open and shows the error when creation fails", async () => {
+    const user = userEvent.setup();
+    hookState.createAt = () => {
+      hookState.error = "Library already exists";
+      return Promise.resolve(false);
+    };
+    render(<LibraryPicker />);
+    await openCreateDialog(user);
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent("Library already exists"),
+    );
+    expect(screen.getByPlaceholderText("Library name")).toHaveValue("Main");
+  });
+
+  it("closes the dialog on successful creation", async () => {
+    const user = userEvent.setup();
+    render(<LibraryPicker />);
+    await openCreateDialog(user);
+
+    await waitFor(() =>
+      expect(screen.queryByPlaceholderText("Library name")).not.toBeInTheDocument(),
+    );
   });
 });

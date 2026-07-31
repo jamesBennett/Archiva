@@ -32,28 +32,39 @@ export function useLibrary() {
   // rely on library-changed events.
   useEffect(() => {
     let cleanedUp = false;
+    let gotEvent = false;
     let unlisten: (() => void) | null = null;
 
     void (async () => {
       try {
+        // Listener first: registering after the fetch would drop an event
+        // emitted between the two IPC round-trips.
+        const fn = await listen<LibraryInfo | null>("library-changed", (event) => {
+          gotEvent = true;
+          reset();
+          setCurrentLibrary(event.payload);
+          setLibraryLoading(false);
+          void refreshRecents();
+        });
+        if (cleanedUp) {
+          fn();
+          return;
+        }
+        unlisten = fn;
+
         const lib = await currentLibrary();
-        if (!cleanedUp) setCurrentLibrary(lib);
+        // An event that landed while the fetch was in flight is newer — keep it.
+        if (!cleanedUp && !gotEvent) {
+          setCurrentLibrary(lib);
+          setLibraryLoading(false);
+        }
       } catch (e) {
-        if (!cleanedUp) setError(String(e));
-      } finally {
-        if (!cleanedUp) setLibraryLoading(false);
+        if (!cleanedUp && !gotEvent) {
+          setError(String(e));
+          setLibraryLoading(false);
+        }
       }
     })();
-
-    listen<LibraryInfo | null>("library-changed", (event) => {
-      reset();
-      setCurrentLibrary(event.payload);
-      setLibraryLoading(false);
-      void refreshRecents();
-    }).then((fn) => {
-      if (cleanedUp) fn();
-      else unlisten = fn;
-    });
 
     return () => {
       cleanedUp = true;
@@ -65,23 +76,32 @@ export function useLibrary() {
     void refreshRecents();
   }, [refreshRecents]);
 
-  const openAt = useCallback(async (path: string) => {
+  // Return false rather than throwing so callers can keep their UI open on
+  // failure; the message is in `error`.
+  const openAt = useCallback(async (path: string): Promise<boolean> => {
     setError(null);
     try {
       await openLibrary(path);
+      return true;
     } catch (e) {
       setError(String(e));
+      return false;
     }
   }, []);
 
-  const createAt = useCallback(async (parentDir: string, name: string) => {
-    setError(null);
-    try {
-      await createLibrary(parentDir, name);
-    } catch (e) {
-      setError(String(e));
-    }
-  }, []);
+  const createAt = useCallback(
+    async (parentDir: string, name: string): Promise<boolean> => {
+      setError(null);
+      try {
+        await createLibrary(parentDir, name);
+        return true;
+      } catch (e) {
+        setError(String(e));
+        return false;
+      }
+    },
+    [],
+  );
 
   const close = useCallback(async () => {
     try {
