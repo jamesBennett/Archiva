@@ -112,6 +112,7 @@ dependencies = [
  "env_logger",
  "image",
  "kamadak-exif",
+ "libc",
  "log",
  "serde",
  "serde_json",

@@ -1,5 +1,6 @@
 pub mod commands;
 pub mod db;
+pub mod library;
 pub mod types;
 
 use tauri::Manager;
