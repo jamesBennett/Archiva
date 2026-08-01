@@ -177,15 +177,18 @@ impl From<AlbumRow> for Album {
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
-pub async fn list_albums(pool: State<'_, SqlitePool>) -> Result<Vec<Album>, String> {
-    list_albums_impl(pool.inner())
-        .await
-        .map_err(|e| e.to_string())
+pub async fn list_albums(state: State<'_, crate::state::AppState>) -> Result<Vec<Album>, String> {
+    let pool = state.pool().await?;
+    list_albums_impl(&pool).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn create_album(name: String, pool: State<'_, SqlitePool>) -> Result<Album, String> {
-    create_album_impl(pool.inner(), &name)
+pub async fn create_album(
+    name: String,
+    state: State<'_, crate::state::AppState>,
+) -> Result<Album, String> {
+    let pool = state.pool().await?;
+    create_album_impl(&pool, &name)
         .await
         .map_err(|e| e.to_string())
 }
@@ -194,16 +197,21 @@ pub async fn create_album(name: String, pool: State<'_, SqlitePool>) -> Result<A
 pub async fn rename_album(
     id: String,
     name: String,
-    pool: State<'_, SqlitePool>,
+    state: State<'_, crate::state::AppState>,
 ) -> Result<(), String> {
-    rename_album_impl(pool.inner(), &id, &name)
+    let pool = state.pool().await?;
+    rename_album_impl(&pool, &id, &name)
         .await
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn delete_album(id: String, pool: State<'_, SqlitePool>) -> Result<(), String> {
-    delete_album_impl(pool.inner(), &id)
+pub async fn delete_album(
+    id: String,
+    state: State<'_, crate::state::AppState>,
+) -> Result<(), String> {
+    let pool = state.pool().await?;
+    delete_album_impl(&pool, &id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -211,9 +219,10 @@ pub async fn delete_album(id: String, pool: State<'_, SqlitePool>) -> Result<(),
 #[tauri::command]
 pub async fn reorder_albums(
     ordered_ids: Vec<String>,
-    pool: State<'_, SqlitePool>,
+    state: State<'_, crate::state::AppState>,
 ) -> Result<(), String> {
-    reorder_albums_impl(pool.inner(), &ordered_ids)
+    let pool = state.pool().await?;
+    reorder_albums_impl(&pool, &ordered_ids)
         .await
         .map_err(|e| e.to_string())
 }
@@ -221,9 +230,10 @@ pub async fn reorder_albums(
 #[tauri::command]
 pub async fn list_album_photos(
     album_id: String,
-    pool: State<'_, SqlitePool>,
+    state: State<'_, crate::state::AppState>,
 ) -> Result<Vec<String>, String> {
-    list_album_photos_impl(pool.inner(), &album_id)
+    let pool = state.pool().await?;
+    list_album_photos_impl(&pool, &album_id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -232,9 +242,10 @@ pub async fn list_album_photos(
 pub async fn add_photos_to_album(
     album_id: String,
     photo_ids: Vec<String>,
-    pool: State<'_, SqlitePool>,
+    state: State<'_, crate::state::AppState>,
 ) -> Result<usize, String> {
-    add_photos_to_album_impl(pool.inner(), &album_id, &photo_ids)
+    let pool = state.pool().await?;
+    add_photos_to_album_impl(&pool, &album_id, &photo_ids)
         .await
         .map_err(|e| e.to_string())
 }
@@ -243,9 +254,10 @@ pub async fn add_photos_to_album(
 pub async fn remove_photos_from_album(
     album_id: String,
     photo_ids: Vec<String>,
-    pool: State<'_, SqlitePool>,
+    state: State<'_, crate::state::AppState>,
 ) -> Result<usize, String> {
-    remove_photos_from_album_impl(pool.inner(), &album_id, &photo_ids)
+    let pool = state.pool().await?;
+    remove_photos_from_album_impl(&pool, &album_id, &photo_ids)
         .await
         .map_err(|e| e.to_string())
 }

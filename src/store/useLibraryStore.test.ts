@@ -50,6 +50,8 @@ describe("useLibraryStore", () => {
       pendingScrollTop: null,
       viewMode: "grid",
       scrollToActivePending: false,
+      currentLibrary: null,
+      libraryLoading: true,
     });
   });
 
@@ -201,5 +203,50 @@ describe("useLibraryStore", () => {
     useLibraryStore.getState().enterSingle("a");
     useLibraryStore.getState().enterSingle("b");
     expect(useLibraryStore.getState().activePhotoId).toBe("b");
+  });
+
+  it("reset clears per-library data but keeps currentLibrary and UI prefs", () => {
+    useLibraryStore.setState({
+      photos: [makePhoto("a")],
+      selectedIds: new Set(["a"]),
+      activePhotoId: "a",
+      activeSource: { kind: "album", id: "alb1" },
+      viewMode: "single",
+      albumPhotoIds: new Map([["alb1", new Set(["a"])]]),
+      history: [
+        { source: { kind: "library" }, scrollTop: 0 },
+        { source: { kind: "album", id: "alb1" }, scrollTop: 120 },
+      ],
+      historyIndex: 1,
+      liveScrollTop: 120,
+      pendingScrollTop: 40,
+      expandedYears: new Set([2024]),
+      foldersHeightPct: 33,
+      currentLibrary: { uuid: "u", name: "Lib", path: "/x.archivalib" },
+    });
+    useLibraryStore.getState().reset();
+    const s = useLibraryStore.getState();
+    expect(s.photos).toEqual([]);
+    expect(s.albums).toEqual([]);
+    expect(s.selectedIds.size).toBe(0);
+    expect(s.activePhotoId).toBeNull();
+    expect(s.activeSource).toEqual({ kind: "library" });
+    expect(s.viewMode).toBe("grid");
+    expect(s.albumPhotoIds.size).toBe(0);
+    expect(s.history).toEqual([{ source: { kind: "library" }, scrollTop: 0 }]);
+    expect(s.historyIndex).toBe(0);
+    expect(s.liveScrollTop).toBe(0);
+    expect(s.pendingScrollTop).toBeNull();
+    // UI prefs and the library itself survive
+    expect(s.expandedYears.has(2024)).toBe(true);
+    expect(s.foldersHeightPct).toBe(33);
+    expect(s.currentLibrary?.uuid).toBe("u");
+  });
+
+  it("setCurrentLibrary updates the library", () => {
+    useLibraryStore
+      .getState()
+      .setCurrentLibrary({ uuid: "u2", name: "Other", path: "/y.archivalib" });
+    expect(useLibraryStore.getState().currentLibrary?.name).toBe("Other");
   });
 });

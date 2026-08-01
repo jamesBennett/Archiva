@@ -12,6 +12,7 @@ import {
 import { arrayMove } from "@dnd-kit/sortable";
 import { AddToCollectionButton } from "../components/AddToCollectionButton";
 import { FolderPicker } from "../components/FolderPicker";
+import { LibrarySwitcher } from "../components/LibrarySwitcher";
 import { MetadataPanel } from "../components/MetadataPanel";
 import { PhotoGrid } from "../components/PhotoGrid";
 import { SinglePhotoView } from "../components/SinglePhotoView";
@@ -148,6 +149,7 @@ export function Library() {
             {loading && <span className="text-xs text-muted">Loading…</span>}
           </div>
           <div className="flex items-center gap-2">
+            <LibrarySwitcher />
             <AddToCollectionButton />
             <button
               type="button"

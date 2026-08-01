@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ActiveSource, Album, Photo } from "../types";
+import type { ActiveSource, Album, LibraryInfo, Photo } from "../types";
 
 const SPLIT_STORAGE_KEY = "archiva.sideNavSplit";
 
@@ -72,6 +72,12 @@ interface LibraryState {
   consumePendingScrollTop: () => void;
   historyBack: () => void;
   historyForward: () => void;
+
+  currentLibrary: LibraryInfo | null;
+  libraryLoading: boolean;
+  setCurrentLibrary: (lib: LibraryInfo | null) => void;
+  setLibraryLoading: (loading: boolean) => void;
+  reset: () => void;
 }
 
 const INITIAL_SOURCE: ActiveSource = { kind: "library" };
@@ -92,6 +98,9 @@ export const useLibraryStore = create<LibraryState>((set) => ({
   historyIndex: 0,
   liveScrollTop: 0,
   pendingScrollTop: null,
+
+  currentLibrary: null,
+  libraryLoading: true,
 
   setPhotos: (photos) => set({ photos }),
   setAlbums: (albums) => set({ albums }),
@@ -193,5 +202,25 @@ export const useLibraryStore = create<LibraryState>((set) => ({
         activeSource: entry.source,
         pendingScrollTop: entry.scrollTop,
       };
+    }),
+
+  setCurrentLibrary: (lib) => set({ currentLibrary: lib }),
+  setLibraryLoading: (loading) => set({ libraryLoading: loading }),
+  // Clears per-library data on library switch. Deliberately preserves UI
+  // prefs (expandedYears, foldersHeightPct) and currentLibrary itself.
+  reset: () =>
+    set({
+      photos: [],
+      albums: [],
+      selectedIds: new Set<string>(),
+      activePhotoId: null,
+      activeSource: INITIAL_SOURCE,
+      viewMode: "grid",
+      scrollToActivePending: false,
+      albumPhotoIds: new Map<string, Set<string>>(),
+      history: [{ source: INITIAL_SOURCE, scrollTop: 0 }],
+      historyIndex: 0,
+      liveScrollTop: 0,
+      pendingScrollTop: null,
     }),
 }));

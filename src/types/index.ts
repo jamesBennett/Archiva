@@ -66,3 +66,14 @@ export interface DateTree {
   years: YearNode[]; // desc
   noDateCount: number;
 }
+
+export interface LibraryInfo {
+  uuid: string;
+  name: string;
+  path: string;
+}
+
+export interface RecentLibraryInfo extends LibraryInfo {
+  last_opened: string;
+  exists: boolean;
+}
