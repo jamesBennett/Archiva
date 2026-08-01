@@ -48,7 +48,8 @@ export type ActiveSource =
   | { kind: "library" }
   | { kind: "date"; year: number; month?: number }
   | { kind: "album"; id: string }
-  | { kind: "no-date" };
+  | { kind: "no-date" }
+  | { kind: "folder"; path: string };
 
 export interface MonthNode {
   month: number; // 1-12
@@ -65,6 +66,18 @@ export interface DateTree {
   total: number;
   years: YearNode[]; // desc
   noDateCount: number;
+}
+
+export interface FolderNode {
+  name: string; // display label; joined segments when chain is collapsed
+  path: string; // full directory path
+  count: number; // photos in this dir + all subdirs
+  children: FolderNode[]; // sorted by name asc
+}
+
+export interface FolderTree {
+  total: number;
+  roots: FolderNode[]; // sorted by name asc
 }
 
 export interface LibraryInfo {

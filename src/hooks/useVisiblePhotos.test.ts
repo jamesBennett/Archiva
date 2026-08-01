@@ -69,4 +69,18 @@ describe("filterPhotos", () => {
   it("album returns empty when cache is missing the album", () => {
     expect(run({ kind: "album", id: "alb-missing" })).toEqual([]);
   });
+
+  it("folder returns photos in that directory and subdirectories", () => {
+    const folderPhotos = [
+      { ...p("x", null), path: "/Pics/x.jpg" },
+      { ...p("y", null), path: "/Pics/Sub/y.jpg" },
+      { ...p("z", null), path: "/Pics2/z.jpg" },
+    ];
+    const ids = filterPhotos(
+      folderPhotos,
+      { kind: "folder", path: "/Pics" },
+      new Map(),
+    ).map((x) => x.id);
+    expect(ids).toEqual(["x", "y"]);
+  });
 });

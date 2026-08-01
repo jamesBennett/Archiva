@@ -19,6 +19,10 @@ export function filterPhotos(
       if (!ids) return [];
       return photos.filter((p) => ids.has(p.id));
     }
+    case "folder": {
+      const prefix = `${src.path}/`;
+      return photos.filter((p) => p.path.startsWith(prefix));
+    }
   }
 }
 
