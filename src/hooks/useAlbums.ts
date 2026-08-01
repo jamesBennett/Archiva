@@ -2,9 +2,11 @@ import { useCallback, useEffect } from "react";
 import {
   addPhotosToAlbum as apiAddPhotos,
   createAlbum as apiCreateAlbum,
+  deleteAlbum as apiDeleteAlbum,
   listAlbumPhotos as apiListAlbumPhotos,
   listAlbums as apiListAlbums,
   removePhotosFromAlbum as apiRemovePhotos,
+  renameAlbum as apiRenameAlbum,
   reorderAlbums as apiReorderAlbums,
 } from "../lib/tauri";
 import { useLibraryStore } from "../store/useLibraryStore";
@@ -16,6 +18,8 @@ export function useAlbums() {
   const activeSource = useLibraryStore((s) => s.activeSource);
   const albumPhotoIds = useLibraryStore((s) => s.albumPhotoIds);
   const setAlbumPhotoIds = useLibraryStore((s) => s.setAlbumPhotoIds);
+  const removeAlbumPhotoIds = useLibraryStore((s) => s.removeAlbumPhotoIds);
+  const setActiveSource = useLibraryStore((s) => s.setActiveSource);
 
   const refresh = useCallback(async () => {
     const rows = await apiListAlbums();
@@ -96,5 +100,39 @@ export function useAlbums() {
     [albumPhotoIds, setAlbumPhotoIds],
   );
 
-  return { albums, refresh, reorder, addPhotos, create, removePhotos };
+  const rename = useCallback(
+    async (id: string, name: string) => {
+      const prev = albums;
+      setAlbums(albums.map((a) => (a.id === id ? { ...a, name } : a)));
+      try {
+        await apiRenameAlbum(id, name);
+      } catch (e) {
+        setAlbums(prev);
+        throw e;
+      }
+    },
+    [albums, setAlbums],
+  );
+
+  const remove = useCallback(
+    async (id: string) => {
+      const prev = albums;
+      const prevSource = activeSource;
+      setAlbums(albums.filter((a) => a.id !== id));
+      if (activeSource.kind === "album" && activeSource.id === id) {
+        setActiveSource({ kind: "library" });
+      }
+      try {
+        await apiDeleteAlbum(id);
+        removeAlbumPhotoIds(id);
+      } catch (e) {
+        setAlbums(prev);
+        setActiveSource(prevSource);
+        throw e;
+      }
+    },
+    [albums, setAlbums, activeSource, setActiveSource, removeAlbumPhotoIds],
+  );
+
+  return { albums, refresh, reorder, addPhotos, create, removePhotos, rename, remove };
 }
