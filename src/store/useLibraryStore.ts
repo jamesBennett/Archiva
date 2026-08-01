@@ -28,6 +28,7 @@ function sourcesEqual(a: ActiveSource, b: ActiveSource): boolean {
   if (a.kind === "date" && b.kind === "date")
     return a.year === b.year && a.month === b.month;
   if (a.kind === "album" && b.kind === "album") return a.id === b.id;
+  if (a.kind === "folder" && b.kind === "folder") return a.path === b.path;
   return true;
 }
 
@@ -43,7 +44,9 @@ interface LibraryState {
   activeSource: ActiveSource;
   activePhotoId: string | null;
   viewMode: "grid" | "single";
+  foldersTab: "date" | "folder";
   expandedYears: Set<number>;
+  expandedFolders: Set<string>;
   foldersHeightPct: number;
   albumPhotoIds: Map<string, Set<string>>;
 
@@ -58,7 +61,9 @@ interface LibraryState {
   toggleSelect: (id: string) => void;
   clearSelection: () => void;
   setActiveSource: (s: ActiveSource) => void;
+  setFoldersTab: (tab: "date" | "folder") => void;
   toggleYear: (year: number) => void;
+  toggleFolder: (path: string) => void;
   setFoldersHeightPct: (n: number) => void;
   setAlbumPhotoIds: (albumId: string, ids: Set<string>) => void;
   removeAlbumPhotoIds: (albumId: string) => void;
@@ -90,7 +95,9 @@ export const useLibraryStore = create<LibraryState>((set) => ({
   activePhotoId: null,
   viewMode: "grid",
   scrollToActivePending: false,
+  foldersTab: "date",
   expandedYears: new Set<number>(),
+  expandedFolders: new Set<string>(),
   foldersHeightPct: loadSplit(),
   albumPhotoIds: new Map<string, Set<string>>(),
 
@@ -135,12 +142,20 @@ export const useLibraryStore = create<LibraryState>((set) => ({
       };
     }),
 
+  setFoldersTab: (tab) => set({ foldersTab: tab }),
   toggleYear: (year) =>
     set((state) => {
       const next = new Set(state.expandedYears);
       if (next.has(year)) next.delete(year);
       else next.add(year);
       return { expandedYears: next };
+    }),
+  toggleFolder: (path) =>
+    set((state) => {
+      const next = new Set(state.expandedFolders);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return { expandedFolders: next };
     }),
   setFoldersHeightPct: (n) => {
     const clamped = Math.min(80, Math.max(20, n));
@@ -207,7 +222,8 @@ export const useLibraryStore = create<LibraryState>((set) => ({
   setCurrentLibrary: (lib) => set({ currentLibrary: lib }),
   setLibraryLoading: (loading) => set({ libraryLoading: loading }),
   // Clears per-library data on library switch. Deliberately preserves UI
-  // prefs (expandedYears, foldersHeightPct) and currentLibrary itself.
+  // prefs (foldersTab, expandedYears, expandedFolders, foldersHeightPct)
+  // and currentLibrary itself.
   reset: () =>
     set({
       photos: [],

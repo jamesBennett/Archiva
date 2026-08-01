@@ -42,6 +42,8 @@ describe("useLibraryStore", () => {
       activeSource: { kind: "library" },
       activePhotoId: null,
       expandedYears: new Set<number>(),
+      expandedFolders: new Set<string>(),
+      foldersTab: "date",
       foldersHeightPct: 50,
       albumPhotoIds: new Map(),
       history: [{ source: { kind: "library" }, scrollTop: 0 }],
@@ -99,6 +101,28 @@ describe("useLibraryStore", () => {
     expect(useLibraryStore.getState().expandedYears.has(2019)).toBe(true);
     useLibraryStore.getState().toggleYear(2019);
     expect(useLibraryStore.getState().expandedYears.has(2019)).toBe(false);
+  });
+
+  it("toggleFolder adds then removes path from expanded set", () => {
+    useLibraryStore.getState().toggleFolder("/Pics");
+    expect(useLibraryStore.getState().expandedFolders.has("/Pics")).toBe(true);
+    useLibraryStore.getState().toggleFolder("/Pics");
+    expect(useLibraryStore.getState().expandedFolders.has("/Pics")).toBe(false);
+  });
+
+  it("setFoldersTab switches between date and folder", () => {
+    expect(useLibraryStore.getState().foldersTab).toBe("date");
+    useLibraryStore.getState().setFoldersTab("folder");
+    expect(useLibraryStore.getState().foldersTab).toBe("folder");
+  });
+
+  it("setActiveSource dedupes identical folder sources", () => {
+    const s = useLibraryStore.getState();
+    s.setActiveSource({ kind: "folder", path: "/Pics" });
+    s.setActiveSource({ kind: "folder", path: "/Pics" });
+    expect(useLibraryStore.getState().history.length).toBe(2);
+    s.setActiveSource({ kind: "folder", path: "/Pics/Sub" });
+    expect(useLibraryStore.getState().history.length).toBe(3);
   });
 
   it("setFoldersHeightPct clamps to 20-80", () => {
