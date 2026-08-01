@@ -110,4 +110,22 @@ describe("useAlbums rename/remove", () => {
     await expect(act(() => result.current.remove("a2"))).rejects.toThrow("db locked");
     expect(useLibraryStore.getState().albums.map((a) => a.id)).toEqual(["a1", "a2"]);
   });
+
+  it("remove prunes the album's cached photo ids on success", async () => {
+    vi.mocked(deleteAlbum).mockResolvedValue(undefined);
+    useLibraryStore.getState().setAlbumPhotoIds("a2", new Set(["p1", "p2"]));
+    const { result } = renderHook(() => useAlbums());
+    await act(async () => {});
+    await act(() => result.current.remove("a2"));
+    expect(useLibraryStore.getState().albumPhotoIds.has("a2")).toBe(false);
+  });
+
+  it("remove keeps the cached photo ids when the API call fails", async () => {
+    vi.mocked(deleteAlbum).mockRejectedValue(new Error("db locked"));
+    useLibraryStore.getState().setAlbumPhotoIds("a2", new Set(["p1", "p2"]));
+    const { result } = renderHook(() => useAlbums());
+    await act(async () => {});
+    await expect(act(() => result.current.remove("a2"))).rejects.toThrow("db locked");
+    expect(useLibraryStore.getState().albumPhotoIds.get("a2")).toEqual(new Set(["p1", "p2"]));
+  });
 });

@@ -34,7 +34,10 @@ export function RenameAlbumDialog({ album, onClose, onRename }: Props) {
     <Dialog.Root open onOpenChange={(next) => !next && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 w-96 -translate-x-1/2 -translate-y-1/2 rounded-md border border-border bg-panel p-4 text-white">
+        <Dialog.Content
+          aria-describedby={undefined}
+          className="fixed left-1/2 top-1/2 w-96 -translate-x-1/2 -translate-y-1/2 rounded-md border border-border bg-panel p-4 text-white"
+        >
           <Dialog.Title className="text-sm font-semibold">Rename album</Dialog.Title>
           <form
             onSubmit={(e) => {
@@ -45,6 +48,7 @@ export function RenameAlbumDialog({ album, onClose, onRename }: Props) {
             <input
               autoFocus
               type="text"
+              aria-label="Album name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               onFocus={(e) => e.target.select()}

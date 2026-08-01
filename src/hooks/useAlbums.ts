@@ -18,6 +18,7 @@ export function useAlbums() {
   const activeSource = useLibraryStore((s) => s.activeSource);
   const albumPhotoIds = useLibraryStore((s) => s.albumPhotoIds);
   const setAlbumPhotoIds = useLibraryStore((s) => s.setAlbumPhotoIds);
+  const removeAlbumPhotoIds = useLibraryStore((s) => s.removeAlbumPhotoIds);
   const setActiveSource = useLibraryStore((s) => s.setActiveSource);
 
   const refresh = useCallback(async () => {
@@ -123,13 +124,14 @@ export function useAlbums() {
       }
       try {
         await apiDeleteAlbum(id);
+        removeAlbumPhotoIds(id);
       } catch (e) {
         setAlbums(prev);
         setActiveSource(prevSource);
         throw e;
       }
     },
-    [albums, setAlbums, activeSource, setActiveSource],
+    [albums, setAlbums, activeSource, setActiveSource, removeAlbumPhotoIds],
   );
 
   return { albums, refresh, reorder, addPhotos, create, removePhotos, rename, remove };

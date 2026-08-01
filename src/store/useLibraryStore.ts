@@ -61,6 +61,7 @@ interface LibraryState {
   toggleYear: (year: number) => void;
   setFoldersHeightPct: (n: number) => void;
   setAlbumPhotoIds: (albumId: string, ids: Set<string>) => void;
+  removeAlbumPhotoIds: (albumId: string) => void;
 
   scrollToActivePending: boolean;
   enterSingle: (photoId: string) => void;
@@ -141,6 +142,13 @@ export const useLibraryStore = create<LibraryState>((set) => ({
     set((state) => {
       const next = new Map(state.albumPhotoIds);
       next.set(albumId, ids);
+      return { albumPhotoIds: next };
+    }),
+  removeAlbumPhotoIds: (albumId) =>
+    set((state) => {
+      if (!state.albumPhotoIds.has(albumId)) return {};
+      const next = new Map(state.albumPhotoIds);
+      next.delete(albumId);
       return { albumPhotoIds: next };
     }),
 
