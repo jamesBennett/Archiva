@@ -1,5 +1,11 @@
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
-import type { Photo, ScanResult, Album } from "../types";
+import type {
+  Photo,
+  ScanResult,
+  Album,
+  LibraryInfo,
+  RecentLibraryInfo,
+} from "../types";
 
 export function scanFolder(path: string): Promise<ScanResult> {
   return invoke<ScanResult>("scan_folder", { path });
@@ -52,4 +58,31 @@ export function addPhotosToAlbum(albumId: string, photoIds: string[]): Promise<n
 
 export function removePhotosFromAlbum(albumId: string, photoIds: string[]): Promise<number> {
   return invoke<number>("remove_photos_from_album", { albumId, photoIds });
+}
+
+export function listRecentLibraries(): Promise<RecentLibraryInfo[]> {
+  return invoke<RecentLibraryInfo[]>("list_recent_libraries");
+}
+
+export function createLibrary(
+  parentDir: string,
+  name: string,
+): Promise<LibraryInfo> {
+  return invoke<LibraryInfo>("create_library", { parentDir, name });
+}
+
+export function openLibrary(path: string): Promise<LibraryInfo> {
+  return invoke<LibraryInfo>("open_library", { path });
+}
+
+export function currentLibrary(): Promise<LibraryInfo | null> {
+  return invoke<LibraryInfo | null>("current_library");
+}
+
+export function closeLibrary(): Promise<void> {
+  return invoke<void>("close_library");
+}
+
+export function revealLibrary(): Promise<void> {
+  return invoke<void>("reveal_library");
 }
