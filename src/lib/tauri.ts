@@ -2,6 +2,7 @@ import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import type {
   Photo,
   ScanResult,
+  RescanResult,
   Album,
   LibraryInfo,
   RecentLibraryInfo,
@@ -9,6 +10,10 @@ import type {
 
 export function scanFolder(path: string): Promise<ScanResult> {
   return invoke<ScanResult>("scan_folder", { path });
+}
+
+export function rescanFolders(): Promise<RescanResult> {
+  return invoke<RescanResult>("rescan_folders");
 }
 
 export function listPhotos(): Promise<Photo[]> {

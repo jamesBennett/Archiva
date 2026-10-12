@@ -55,6 +55,14 @@ pub struct ScanResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RescanResult {
+    pub folders: usize,
+    pub inserted: usize,
+    pub skipped: usize,
+    pub missing: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Album {
     pub id: String,
     pub name: String,

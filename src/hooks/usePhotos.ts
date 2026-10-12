@@ -1,8 +1,8 @@
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { listPhotos, scanFolder } from "../lib/tauri";
+import { listPhotos, rescanFolders, scanFolder } from "../lib/tauri";
 import { useLibraryStore } from "../store/useLibraryStore";
-import type { ScanResult } from "../types";
+import type { RescanResult, ScanResult } from "../types";
 
 export function usePhotos() {
   const photos = useLibraryStore((s) => s.photos);
@@ -42,6 +42,22 @@ export function usePhotos() {
     [setPhotos],
   );
 
+  const rescan = useCallback(async (): Promise<RescanResult> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await rescanFolders();
+      const rows = await listPhotos();
+      setPhotos(rows);
+      return result;
+    } catch (e) {
+      setError(String(e));
+      throw e;
+    } finally {
+      setLoading(false);
+    }
+  }, [setPhotos]);
+
   useEffect(() => {
     void refresh();
   }, [refresh]);
@@ -70,5 +86,5 @@ export function usePhotos() {
     };
   }, [refresh]);
 
-  return { photos, loading, error, refresh, scan };
+  return { photos, loading, error, refresh, scan, rescan };
 }
