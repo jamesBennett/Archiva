@@ -9,3 +9,19 @@ html, body, #root {
   color: #e6e8ec;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
 }
+
+.photo-preview {
+  animation: photo-preview-reveal 180ms ease-out;
+  transition: opacity 180ms ease-out;
+}
+
+@keyframes photo-preview-reveal {
+  from { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photo-preview {
+    animation: none;
+    transition: none;
+  }
+}

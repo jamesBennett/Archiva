@@ -14,7 +14,8 @@ export function usePreview(
   photoId: string | null,
   maxPx: number,
 ): UsePreviewResult {
-  const [state, setState] = useState<UsePreviewResult>({
+  const [state, setState] = useState<UsePreviewResult & { photoId: string | null }>({
+    photoId: null,
     url: null,
     loading: false,
     error: null,
@@ -22,30 +23,36 @@ export function usePreview(
   const requestSeqRef = useRef(0);
 
   useEffect(() => {
+    const seq = ++requestSeqRef.current;
     if (!photoId || maxPx <= 0) {
-      setState({ url: null, loading: false, error: null });
+      setState({ photoId, url: null, loading: false, error: null });
       return;
     }
 
-    const seq = ++requestSeqRef.current;
-    setState((s) => ({ ...s, loading: true, error: null }));
+    setState((s) => ({
+      photoId, url: s.photoId === photoId ? s.url : null, loading: true, error: null,
+    }));
 
     const timer = setTimeout(() => {
       generatePreview(photoId, maxPx)
         .then((path) => {
           if (seq !== requestSeqRef.current) return;
-          setState({ url: convertFileSrc(path), loading: false, error: null });
+          setState({ photoId, url: convertFileSrc(path), loading: false, error: null });
         })
         .catch((e: unknown) => {
           if (seq !== requestSeqRef.current) return;
-          setState({ url: null, loading: false, error: String(e) });
+          setState({ photoId, url: null, loading: false, error: String(e) });
         });
     }, DEBOUNCE_MS);
 
     return () => {
       clearTimeout(timer);
+      ++requestSeqRef.current;
     };
   }, [photoId, maxPx]);
 
-  return state;
+  // Never show the previous photo while the next request is starting.
+  return state.photoId === photoId && maxPx > 0
+    ? state
+    : { url: null, loading: !!photoId && maxPx > 0, error: null };
 }

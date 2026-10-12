@@ -113,4 +113,36 @@ describe("usePreview", () => {
     expect(result.current.loading).toBe(false);
     expect(generatePreview).not.toHaveBeenCalled();
   });
+
+  it("clears the previous photo immediately while the next preview loads", async () => {
+    vi.mocked(generatePreview).mockResolvedValue("/tmp/previews/p1.jpg");
+    const { result, rerender } = renderHook(
+      ({ id }: { id: string }) => usePreview(id, 900),
+      { initialProps: { id: "p1" } },
+    );
+    await act(async () => { await vi.runAllTimersAsync(); });
+    expect(result.current.url).toContain("p1.jpg");
+
+    rerender({ id: "p2" });
+    expect(result.current.url).toBeNull();
+    expect(result.current.loading).toBe(true);
+  });
+
+  it("ignores an in-flight preview after the active photo is cleared", async () => {
+    let resolvePreview!: (path: string) => void;
+    vi.mocked(generatePreview).mockImplementation(() => new Promise((resolve) => {
+      resolvePreview = resolve;
+    }));
+    const { result, rerender } = renderHook(
+      ({ id }: { id: string | null }) => usePreview(id, 900),
+      { initialProps: { id: "p1" as string | null } },
+    );
+    await act(async () => { await vi.runAllTimersAsync(); });
+    rerender({ id: null });
+    await act(async () => { resolvePreview("/tmp/previews/p1.jpg"); });
+
+    expect(result.current.url).toBeNull();
+    expect(result.current.loading).toBe(false);
+    expect(result.current.error).toBeNull();
+  });
 });

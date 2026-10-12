@@ -37,6 +37,16 @@ interface HistoryEntry {
   scrollTop: number;
 }
 
+export interface PhotoOpenOrigin {
+  photoId: string;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  imageWidth: number;
+  imageHeight: number;
+}
+
 interface LibraryState {
   photos: Photo[];
   albums: Album[];
@@ -69,7 +79,8 @@ interface LibraryState {
   removeAlbumPhotoIds: (albumId: string) => void;
 
   scrollToActivePending: boolean;
-  enterSingle: (photoId: string) => void;
+  photoOpenOrigin: PhotoOpenOrigin | null;
+  enterSingle: (photoId: string, origin?: PhotoOpenOrigin) => void;
   exitSingle: () => void;
   consumeScrollToActive: () => void;
 
@@ -95,6 +106,7 @@ export const useLibraryStore = create<LibraryState>((set) => ({
   activePhotoId: null,
   viewMode: "grid",
   scrollToActivePending: false,
+  photoOpenOrigin: null,
   foldersTab: "date",
   expandedYears: new Set<number>(),
   expandedFolders: new Set<string>(),
@@ -111,7 +123,7 @@ export const useLibraryStore = create<LibraryState>((set) => ({
 
   setPhotos: (photos) => set({ photos }),
   setAlbums: (albums) => set({ albums }),
-  selectPhoto: (id) => set({ activePhotoId: id }),
+  selectPhoto: (id) => set({ activePhotoId: id, photoOpenOrigin: null }),
   toggleSelect: (id) =>
     set((state) => {
       const next = new Set(state.selectedIds);
@@ -176,8 +188,10 @@ export const useLibraryStore = create<LibraryState>((set) => ({
       return { albumPhotoIds: next };
     }),
 
-  enterSingle: (photoId) => set({ viewMode: "single", activePhotoId: photoId }),
-  exitSingle: () => set({ viewMode: "grid", scrollToActivePending: true }),
+  enterSingle: (photoId, origin) => set({
+    viewMode: "single", activePhotoId: photoId, photoOpenOrigin: origin ?? null,
+  }),
+  exitSingle: () => set({ viewMode: "grid", scrollToActivePending: true, photoOpenOrigin: null }),
   consumeScrollToActive: () => set({ scrollToActivePending: false }),
 
   setLiveScrollTop: (n) => set({ liveScrollTop: n }),
@@ -233,6 +247,7 @@ export const useLibraryStore = create<LibraryState>((set) => ({
       activeSource: INITIAL_SOURCE,
       viewMode: "grid",
       scrollToActivePending: false,
+      photoOpenOrigin: null,
       albumPhotoIds: new Map<string, Set<string>>(),
       history: [{ source: INITIAL_SOURCE, scrollTop: 0 }],
       historyIndex: 0,

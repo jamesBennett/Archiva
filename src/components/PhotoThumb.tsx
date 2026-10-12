@@ -36,7 +36,17 @@ export function PhotoThumb({ photo, selected, active, onClick, selectedIds, onRe
       onClick={onClick}
       onDoubleClick={(e) => {
         e.stopPropagation();
-        enterSingle(photo.id);
+        const image = e.currentTarget.querySelector("img");
+        const rect = image?.getBoundingClientRect();
+        enterSingle(photo.id, image?.naturalWidth && rect ? {
+          photoId: photo.id,
+          left: rect.left,
+          top: rect.top,
+          width: rect.width,
+          height: rect.height,
+          imageWidth: image.naturalWidth,
+          imageHeight: image.naturalHeight,
+        } : undefined);
       }}
       className={clsx(
         "group relative aspect-square overflow-hidden rounded-md bg-panel border transition-colors cursor-pointer",

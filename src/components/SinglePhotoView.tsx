@@ -1,9 +1,9 @@
 import clsx from "clsx";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Photo } from "../types";
-import { thumbUrl } from "../lib/tauri";
 import { useLibraryStore } from "../store/useLibraryStore";
 import { usePreview } from "../hooks/usePreview";
+import { PhotoImage } from "./PhotoImage";
 
 interface Props {
   photos: Photo[];
@@ -13,6 +13,7 @@ interface Props {
 export function SinglePhotoView({ photos, activePhotoId }: Props) {
   const selectPhoto = useLibraryStore((s) => s.selectPhoto);
   const exitSingle = useLibraryStore((s) => s.exitSingle);
+  const origin = useLibraryStore((s) => s.photoOpenOrigin);
 
   const index = useMemo(
     () => photos.findIndex((p) => p.id === activePhotoId),
@@ -26,7 +27,7 @@ export function SinglePhotoView({ photos, activePhotoId }: Props) {
   const surfaceRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = surfaceRef.current;
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
@@ -62,26 +63,20 @@ export function SinglePhotoView({ photos, activePhotoId }: Props) {
 
   if (!photo) return null;
 
-  const fallback = photo.thumb_ready ? thumbUrl(photo.thumb_path) : null;
-  const src = previewUrl ?? fallback ?? undefined;
-
   return (
     <div
       ref={surfaceRef}
       data-testid="single-photo-surface"
       onDoubleClick={exitSingle}
-      className="relative flex h-full w-full items-center justify-center bg-bg"
+      className="relative flex h-full w-full items-center justify-center overflow-hidden bg-bg"
     >
-      {src ? (
-        <img
-          src={src}
-          alt={photo.filename}
-          className="max-h-full max-w-full object-contain select-none"
-          draggable={false}
-        />
-      ) : (
-        <div className="text-sm text-muted">Loading…</div>
-      )}
+      <PhotoImage
+        photo={photo}
+        previewUrl={previewUrl}
+        previewError={error}
+        size={size}
+        origin={origin?.photoId === photo.id ? origin : null}
+      />
 
       {error && (
         <div className="absolute bottom-3 right-3 rounded bg-red-900/70 px-2 py-1 text-xs text-red-100">
