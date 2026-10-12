@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { Photo } from "../types";
 import { SinglePhotoView } from "./SinglePhotoView";
 import { useLibraryStore } from "../store/useLibraryStore";
+import { usePreview } from "../hooks/usePreview";
 
 vi.mock("../hooks/usePreview", () => ({
   usePreview: vi.fn(() => ({ url: null, loading: true, error: null })),
@@ -48,6 +49,7 @@ describe("SinglePhotoView", () => {
   const photos = ["a", "b", "c"].map(makePhoto);
 
   beforeEach(() => {
+    vi.mocked(usePreview).mockReturnValue({ url: null, loading: true, error: null });
     useLibraryStore.setState({
       photos,
       albums: [],
@@ -63,10 +65,12 @@ describe("SinglePhotoView", () => {
       pendingScrollTop: null,
       viewMode: "single",
       scrollToActivePending: false,
+      photoOpenOrigin: null,
     });
   });
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("renders an image for the active photo", () => {
@@ -129,5 +133,71 @@ describe("SinglePhotoView", () => {
     render(<SinglePhotoView photos={photos} activePhotoId="b" />);
     fireEvent.click(screen.getByRole("button", { name: /next/i }));
     expect(useLibraryStore.getState().activePhotoId).toBe("c");
+  });
+
+  describe("preview navigation", () => {
+    const decodes = new Map<string, { resolve: () => void; reject: () => void }>();
+
+    beforeEach(() => {
+      decodes.clear();
+      vi.stubGlobal("Image", class {
+        src = "";
+        naturalWidth = 1200;
+        naturalHeight = 800;
+        decode() {
+          return new Promise<void>((resolve, reject) => {
+            decodes.set(this.src, { resolve, reject: () => reject(new Error("decode failed")) });
+          });
+        }
+      });
+      vi.mocked(usePreview).mockImplementation((id) => ({
+        url: `asset://previews/${id}.jpg`, loading: false, error: null,
+      }));
+    });
+
+    async function decode(id: string) {
+      await act(async () => { decodes.get(`asset://previews/${id}.jpg`)!.resolve(); });
+    }
+
+    it("holds the sharp image while navigating and replaces it without a fade", async () => {
+      const { rerender } = render(<SinglePhotoView photos={photos} activePhotoId="b" />);
+      await decode("b");
+      rerender(<SinglePhotoView photos={photos} activePhotoId="c" />);
+
+      expect(screen.getByRole("img")).toHaveAttribute("src", "asset://previews/b.jpg");
+      expect(screen.getByRole("status")).toHaveTextContent("Loading");
+      expect(screen.queryByAltText("c.jpg")).not.toBeInTheDocument();
+
+      await decode("c");
+      expect(screen.getByRole("img")).toHaveAttribute("src", "asset://previews/c.jpg");
+      expect(screen.getByRole("img")).not.toHaveClass("photo-preview");
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+
+      rerender(<SinglePhotoView photos={photos} activePhotoId="b" />);
+      expect(screen.getByRole("img")).toHaveAttribute("src", "asset://previews/c.jpg");
+      await decode("b");
+      expect(screen.getByRole("img")).toHaveAttribute("src", "asset://previews/b.jpg");
+      expect(screen.getByRole("img")).not.toHaveClass("photo-preview");
+    });
+
+    it("ignores a late decode when navigation skips past that photo", async () => {
+      const { rerender } = render(<SinglePhotoView photos={photos} activePhotoId="a" />);
+      await decode("a");
+      rerender(<SinglePhotoView photos={photos} activePhotoId="b" />);
+      rerender(<SinglePhotoView photos={photos} activePhotoId="c" />);
+      await decode("c");
+      await decode("b");
+      expect(screen.getByRole("img")).toHaveAttribute("src", "asset://previews/c.jpg");
+    });
+
+    it("shows the requested thumbnail if its preview cannot be decoded", async () => {
+      const { rerender } = render(<SinglePhotoView photos={photos} activePhotoId="b" />);
+      await decode("b");
+      rerender(<SinglePhotoView photos={photos} activePhotoId="c" />);
+      await act(async () => { decodes.get("asset://previews/c.jpg")!.reject(); });
+
+      expect(screen.getByRole("img")).toHaveAttribute("src", "asset:///tmp/thumbs/c.jpg");
+      expect(screen.getByRole("status")).toHaveTextContent("Preview failed");
+    });
   });
 });
