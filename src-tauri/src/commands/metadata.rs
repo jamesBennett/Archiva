@@ -33,12 +33,48 @@ pub fn read_exif(path: &Path) -> ExifData {
 
 fn string_field(exif: &exif::Exif, tag: Tag) -> Option<String> {
     let field = exif.get_field(tag, In::PRIMARY)?;
-    let s = field.display_value().to_string();
-    let trimmed = s.trim_matches('"').trim();
+    let s = match &field.value {
+        // The display formatter quotes each ASCII entry, including empty
+        // entries produced by cameras that pad fixed-width fields with NULs.
+        Value::Ascii(values) => values
+            .iter()
+            .map(|bytes| String::from_utf8_lossy(bytes).trim().to_owned())
+            .filter(|text| !text.is_empty())
+            .collect::<Vec<_>>()
+            .join(", "),
+        _ => field.display_value().to_string(),
+    };
+    let trimmed = s.trim();
     if trimmed.is_empty() {
         None
     } else {
         Some(trimmed.to_string())
+    }
+}
+
+/// Clean the old formatter's repeated empty ASCII entries when reading an
+/// existing catalog. This also works when the original photo is offline.
+pub(crate) fn clean_cached_ascii(value: Option<String>) -> Option<String> {
+    let value = value?;
+    let text = value.trim_end();
+    // The old trim_matches('"') removed the final empty entry's quotes,
+    // leaving a trailing comma (e.g. `Lens name", "", "",`).
+    let Some(mut text) = text.strip_suffix(',').map(str::trim_end) else {
+        return Some(value);
+    };
+    let mut removed_padding = false;
+    while let Some(prefix) = text.strip_suffix(", \"\"") {
+        text = prefix;
+        removed_padding = true;
+    }
+    if !removed_padding && !text.is_empty() {
+        return Some(value);
+    }
+    let text = text.strip_suffix('"').unwrap_or(text).trim();
+    if text.is_empty() {
+        None
+    } else {
+        Some(text.to_owned())
     }
 }
 

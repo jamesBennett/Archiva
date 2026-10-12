@@ -232,9 +232,9 @@ impl From<PhotoRow> for Photo {
             created_at: r.created_at,
             modified_at: r.modified_at,
             imported_at: r.imported_at,
-            camera_make: r.camera_make,
-            camera_model: r.camera_model,
-            lens_model: r.lens_model,
+            camera_make: metadata::clean_cached_ascii(r.camera_make),
+            camera_model: metadata::clean_cached_ascii(r.camera_model),
+            lens_model: metadata::clean_cached_ascii(r.lens_model),
             focal_length: r.focal_length,
             aperture: r.aperture,
             shutter_speed: r.shutter_speed,
@@ -295,5 +295,44 @@ mod tests {
 
         let not_ready = photos.iter().find(|p| p.id == "notready").unwrap();
         assert_eq!(not_ready.thumb_path, None);
+    }
+
+    #[tokio::test]
+    async fn list_photos_cleans_legacy_ascii_padding_without_original_files() {
+        let pool = db::connect_in_memory().await.unwrap();
+        db::migrate(&pool).await.unwrap();
+        insert_photo(&pool, "padded", 0).await;
+        insert_photo(&pool, "empty", 0).await;
+        insert_photo(&pool, "normal", 0).await;
+        for (id, lens) in [
+            ("padded", "XF35mmF2 R WR\", \"\", \"\","),
+            ("empty", ", \"\", \"\","),
+            ("normal", "Acme 2\" lens, Limited Edition"),
+        ] {
+            sqlx::query(
+                "UPDATE photos SET lens_model = ?, camera_model = ?, camera_make = ? WHERE id = ?",
+            )
+            .bind(lens)
+            .bind(lens)
+            .bind(lens)
+            .bind(id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+
+        let photos = list_photos_impl(&pool, Path::new("/missing/thumbs"))
+            .await
+            .unwrap();
+        for (id, expected) in [
+            ("padded", Some("XF35mmF2 R WR")),
+            ("empty", None),
+            ("normal", Some("Acme 2\" lens, Limited Edition")),
+        ] {
+            let photo = photos.iter().find(|p| p.id == id).unwrap();
+            assert_eq!(photo.lens_model.as_deref(), expected);
+            assert_eq!(photo.camera_model.as_deref(), expected);
+            assert_eq!(photo.camera_make.as_deref(), expected);
+        }
     }
 }
