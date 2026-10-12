@@ -171,7 +171,10 @@ pub async fn rescan_folders_impl(pool: &SqlitePool) -> anyhow::Result<(RescanRes
     };
     let mut photo_ids = Vec::new();
     for root_path in roots {
-        if !tokio::fs::metadata(&root_path).await.is_ok_and(|m| m.is_dir()) {
+        if !tokio::fs::metadata(&root_path)
+            .await
+            .is_ok_and(|m| m.is_dir())
+        {
             result.missing.push(root_path.to_string_lossy().to_string());
             continue;
         }
@@ -528,7 +531,9 @@ mod tests {
     async fn rescan_reports_missing_folders() {
         let pool = db::connect_in_memory().await.unwrap();
         db::migrate(&pool).await.unwrap();
-        record_folder(Path::new("/definitely/not/here"), &pool).await.unwrap();
+        record_folder(Path::new("/definitely/not/here"), &pool)
+            .await
+            .unwrap();
 
         let (result, ids) = rescan_folders_impl(&pool).await.unwrap();
         assert_eq!(result.folders, 0);
@@ -569,7 +574,10 @@ mod tests {
         ];
         assert_eq!(
             infer_roots(files.into_iter(), Some(Path::new("/Users/me"))),
-            vec![PathBuf::from("/Users/me/Desktop"), PathBuf::from("/Users/me/Pictures/a")],
+            vec![
+                PathBuf::from("/Users/me/Desktop"),
+                PathBuf::from("/Users/me/Pictures/a")
+            ],
         );
 
         let split = [Path::new("/Volumes/X/1.jpg"), Path::new("/p/2.jpg")];
@@ -579,7 +587,10 @@ mod tests {
         );
 
         let trip = [Path::new("/p/trip/a.jpg"), Path::new("/p/trip-2/c.jpg")];
-        assert_eq!(infer_roots(trip.into_iter(), None), vec![PathBuf::from("/p")]);
+        assert_eq!(
+            infer_roots(trip.into_iter(), None),
+            vec![PathBuf::from("/p")]
+        );
     }
 
     #[tokio::test]
@@ -590,7 +601,9 @@ mod tests {
         std::fs::create_dir_all(dir.path().join("2025/sept")).unwrap();
         std::fs::create_dir_all(dir.path().join("2026/oct")).unwrap();
         std::fs::write(dir.path().join("2026/oct/new.jpg"), b"x").unwrap();
-        record_folder(&dir.path().join("2025/sept"), &pool).await.unwrap();
+        record_folder(&dir.path().join("2025/sept"), &pool)
+            .await
+            .unwrap();
         record_folder(dir.path(), &pool).await.unwrap();
 
         let (result, _) = rescan_folders_impl(&pool).await.unwrap();
