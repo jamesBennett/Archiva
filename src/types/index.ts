@@ -33,6 +33,13 @@ export interface ScanResult {
   photo_ids: string[];
 }
 
+export interface RescanResult {
+  folders: number;
+  inserted: number;
+  skipped: number;
+  missing: string[];
+}
+
 export interface Album {
   id: string;
   name: string;

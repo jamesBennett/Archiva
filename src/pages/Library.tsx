@@ -11,10 +11,9 @@ import {
 } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import { AddToCollectionButton } from "../components/AddToCollectionButton";
-import { FolderPicker } from "../components/FolderPicker";
-import { LibrarySwitcher } from "../components/LibrarySwitcher";
 import { MetadataPanel } from "../components/MetadataPanel";
 import { PhotoGrid } from "../components/PhotoGrid";
+import { SettingsMenu } from "../components/SettingsMenu";
 import { SinglePhotoView } from "../components/SinglePhotoView";
 import { SideNav } from "../components/sidenav/SideNav";
 import { useAlbums } from "../hooks/useAlbums";
@@ -24,8 +23,9 @@ import { useLibraryStore } from "../store/useLibraryStore";
 import { thumbUrl } from "../lib/tauri";
 
 export function Library() {
-  const { loading, error, scan, refresh } = usePhotos();
+  const { loading, error, scan, rescan } = usePhotos();
   const photos = useLibraryStore((s) => s.photos);
+  const libraryName = useLibraryStore((s) => s.currentLibrary?.name);
   const activePhotoId = useLibraryStore((s) => s.activePhotoId);
   const activeSource = useLibraryStore((s) => s.activeSource);
   const historyBack = useLibraryStore((s) => s.historyBack);
@@ -47,6 +47,33 @@ export function Library() {
       : undefined;
 
   const visible = useVisiblePhotos();
+
+  const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(null), 5000);
+    return () => clearTimeout(t);
+  }, [notice]);
+
+  async function handleRescan() {
+    try {
+      const r = await rescan();
+      const added = r.inserted === 0 ? "No new photos" : `Added ${r.inserted} photo${r.inserted === 1 ? "" : "s"}`;
+      const missing = r.missing.length > 0 ? ` · ${r.missing.length} folder${r.missing.length === 1 ? "" : "s"} not found` : "";
+      setNotice(added + missing);
+    } catch {
+      // surfaced via `error`
+    }
+  }
+
+  async function handleAddFolder(path: string) {
+    try {
+      const r = await scan(path);
+      setNotice(`Added ${r.inserted} photo${r.inserted === 1 ? "" : "s"}`);
+    } catch {
+      // surfaced via `error`
+    }
+  }
 
   useEffect(() => {
     if (viewMode !== "single") return;
@@ -121,6 +148,7 @@ export function Library() {
         <header className="flex items-center justify-between gap-4 border-b border-border px-4 py-2">
           <div className="flex items-center gap-3">
             <h1 className="text-sm font-semibold">Archiva</h1>
+            {libraryName && <span className="text-sm text-muted">{libraryName}</span>}
             <div className="flex items-center gap-1">
               <button
                 type="button"
@@ -147,18 +175,15 @@ export function Library() {
             </div>
             <span className="text-xs text-muted">{visible.length} photos</span>
             {loading && <span className="text-xs text-muted">Loading…</span>}
+            {!loading && notice && <span className="text-xs text-muted">{notice}</span>}
           </div>
           <div className="flex items-center gap-2">
-            <LibrarySwitcher />
             <AddToCollectionButton />
-            <button
-              type="button"
-              onClick={() => void refresh()}
-              className="rounded-md border border-border bg-panel px-3 py-1.5 text-sm text-white hover:border-muted"
-            >
-              Refresh
-            </button>
-            <FolderPicker onScan={async (p) => { await scan(p); }} disabled={loading} />
+            <SettingsMenu
+              onRescan={() => void handleRescan()}
+              onAddFolder={(p) => void handleAddFolder(p)}
+              busy={loading}
+            />
           </div>
         </header>
 

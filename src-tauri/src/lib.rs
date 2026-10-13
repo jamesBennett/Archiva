@@ -74,6 +74,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::photos::scan_folder,
+            commands::photos::rescan_folders,
             commands::photos::list_photos,
             commands::thumbnails::generate_thumbnail,
             commands::previews::generate_preview,
